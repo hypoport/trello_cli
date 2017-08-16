@@ -17,8 +17,8 @@ if [[ "$#" -eq 0 ]];then
 
 elif [ "$1" = "my_cards" ];then
   shift
-  # : ${card_fields:="due,name,idBoard,shortUrl"}
-  : ${card_fields:="name,idBoard,idList"}
+  : ${card_fields:="due,name,shortUrl,idBoard,idList"}
+  boards_json="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}&filter=open&lists=open")"
   response_json="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
 &visible=open\
 &members=false\
@@ -27,16 +27,7 @@ elif [ "$1" = "my_cards" ];then
 " \
 )"
 
-
-  boards_json="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
-&filter=open\
-&lists=open\
-")"
-
-# | jq -c 'sort_by(.idBoard)|sort_by(.due)|.[]' \
 # | jq -sc 'map(.members=[.members[]?|.initials?])[]' \
-# | jq -sc 'map(del(.id))[]' \
-  # boardName:(\$boards|map(select(.id==.[0].idBoard)|{name})[0].name),\
 
   echo "$response_json" \
   | jq --argjson boards "${boards_json}" \
@@ -44,12 +35,10 @@ elif [ "$1" = "my_cards" ];then
 .|group_by(.idBoard)|map(\
   .[0].idBoard as \$boardId\
   |{\
-  idBoard:.[0].idBoard,\
   boardName:(\$boards|map(select(.id==\$boardId)|{name})[0].name),\
   lists:(.|group_by(.idList)|map(\
     .[0].idList as \$listId\
     |{\
-    idList:.[0].idList,\
     listName:(\
       \$boards|map(select(.id==\$boardId))[0].lists\
       |map(select(.id==\$listId))[0].name\
@@ -60,6 +49,7 @@ elif [ "$1" = "my_cards" ];then
         |del(.idList)\
         |del(.id)\
       )\
+      |sort_by(.due)\
     )\
   }))\
 })"
