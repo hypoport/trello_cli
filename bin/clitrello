@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -eufo pipefail
+trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
+
+while getopts "a:h?" options; do case $options in
+  a) a="$OPTARG" ;;
+  h|?) help; exit ;;
+esac; done; shift $((OPTIND - 1))
+
+[[ -r ~/.$(basename ${0})rc ]] && { source ~/.$(basename ${0})rc; }
+
+: ${a:="default for var a"}
+: ${member:="me"}
+
+if [[ "$#" -eq 0 ]];then
+  :
+
+elif [ "$1" = "my_cards" ];then
+  shift
+  # : ${card_fields:="due,name,idBoard,shortUrl"}
+  : ${card_fields:="name,idBoard,idList"}
+  response_json="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
+&visible=open\
+&members=false\
+&member_fields=initials\
+&fields=${card_fields}\
+" \
+)"
+
+
+  boards_json="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+")"
+
+# | jq -c 'sort_by(.idBoard)|sort_by(.due)|.[]' \
+# | jq -sc 'map(.members=[.members[]?|.initials?])[]' \
+# | jq -sc 'map(del(.id))[]' \
+  # boardName:(\$boards|map(select(.id==.[0].idBoard)|{name})[0].name),\
+
+  echo "$response_json" \
+  | jq --argjson boards "${boards_json}" \
+"\
+.|group_by(.idBoard)|map(\
+  .[0].idBoard as \$boardId\
+  |{\
+  idBoard:.[0].idBoard,\
+  boardName:(\$boards|map(select(.id==\$boardId)|{name})[0].name),\
+  lists:(.|group_by(.idList)|map(\
+    .[0].idList as \$listId\
+    |{\
+    idList:.[0].idList,\
+    listName:(\
+      \$boards|map(select(.id==\$boardId))[0].lists\
+      |map(select(.id==\$listId))[0].name\
+    ),\
+    cards:(\
+      map(\
+        del(.idBoard)\
+        |del(.idList)\
+        |del(.id)\
+      )\
+    )\
+  }))\
+})"
+
+elif [ "$1" = "my_boards" ];then
+  shift
+  response_json="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+" \
+| jq -c '.[]' \
+)"
+  echo "$response_json"
+
+else
+  echo "unknown command: $@" >&2
+  exit 1
+
+fi
+
