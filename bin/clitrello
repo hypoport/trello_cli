@@ -2,6 +2,8 @@
 set -eufo pipefail
 trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
 
+# https://developers.trello.com/v1.0/reference#cards-nested-resource
+
 while getopts "a:h?" options; do case $options in
   a) a="$OPTARG" ;;
   h|?) help; exit ;;
@@ -17,12 +19,17 @@ if [[ "$#" -eq 0 ]];then
 
 elif [ "$1" = "my_cards" ];then
   shift
-  : ${card_fields:="due,name,shortUrl,idBoard,idList"}
+  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
+  # : ${card_fields:="all"}
+  # &members=false\
+  # &member_fields=initials\
+  # &actions=commentCard\
   boards_json="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}&filter=open&lists=open")"
   response_json="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
 &visible=open\
-&members=false\
+&members=true\
 &member_fields=initials\
+&actions=commentCard\
 &fields=${card_fields}\
 " \
 )"
@@ -36,6 +43,7 @@ elif [ "$1" = "my_cards" ];then
   .[0].idBoard as \$boardId\
   |{\
   boardName:(\$boards|map(select(.id==\$boardId)|{name})[0].name),\
+  boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})[0].shortLink),\
   lists:(.|group_by(.idList)|map(\
     .[0].idList as \$listId\
     |{\
@@ -48,11 +56,22 @@ elif [ "$1" = "my_cards" ];then
         del(.idBoard)\
         |del(.idList)\
         |del(.id)\
+        |.actions=(.actions|map({text:(.data.text),date,memberCreator:(.memberCreator.username)}))\
+        |.members=[.members[]?|.initials?] \
       )\
       |sort_by(.due)\
     )\
   }))\
 })"
+
+elif [ "$1" = "format_my_cards" ];then
+  shift
+  $0 my_cards \
+  | jq 'map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:"hide",memberCreator:"sinangoo"}])|not))))))' \
+  | jq 'map(.lists=(.lists|map( if ( (.cards|length) == 0 ) then empty else . end   )))|map( if ( (.lists|length)==0) then empty else . end )' \
+  | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  "> " + .boardName]|.formatted+=[(.lists[]|["##            "+.listName,(.cards[]|"* <" + .shortLink + ">   " + (.due//""|sub("T.*$";" ")) + "[" + (.members|join(",")) + "] " + .name )]|.[])])' \
+  | jq -r 'map(.formatted)|flatten|.[]'
+  echo
 
 elif [ "$1" = "my_boards" ];then
   shift
@@ -63,6 +82,33 @@ elif [ "$1" = "my_boards" ];then
 | jq -c '.[]' \
 )"
   echo "$response_json"
+
+
+elif [ "$1" = "board" ];then
+  shift
+  board_id=$1
+  shift
+  response_json="$(curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&fields=all\
+&cards=open\
+&card_fields=all\
+")"
+
+  echo "$response_json"
+
+elif [ "$1" = "format_board" ];then
+  shift
+  board_id=$1
+  shift
+  $0 board ${board_id} \
+  | jq 'map(.formatted=[]|.formatted+=["\n# " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + .name]|.[])])' \
+  | jq -r 'map(.formatted)|flatten|.[]'
+  echo
+  # | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  "> " +
+  # .boardName]|.formatted+=[(.lists[]|["##            "+.listName,(.cards[]|"*
+  # <" + .shortLink + ">   " + (.due//""|sub("T.*$";" ")) + "[" +
+  # (.members|join(",")) + "] " + .name )]|.[])])' \
 
 else
   echo "unknown command: $@" >&2
