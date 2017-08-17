@@ -102,13 +102,9 @@ elif [ "$1" = "format_board" ];then
   board_id=$1
   shift
   $0 board ${board_id} \
-  | jq 'map(.formatted=[]|.formatted+=["\n# " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + .name]|.[])])' \
+    | jq 'map(.formatted=[]|.formatted+=["\n# " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + "[" + (.idMembers|length|tostring) + "] " + .name]|.[])])' \
   | jq -r 'map(.formatted)|flatten|.[]'
   echo
-  # | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  "> " +
-  # .boardName]|.formatted+=[(.lists[]|["##            "+.listName,(.cards[]|"*
-  # <" + .shortLink + ">   " + (.due//""|sub("T.*$";" ")) + "[" +
-  # (.members|join(",")) + "] " + .name )]|.[])])' \
 
 else
   echo "unknown command: $@" >&2
