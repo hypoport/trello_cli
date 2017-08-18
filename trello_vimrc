@@ -31,6 +31,7 @@ function! BackgroundCommandClose(channel)
   execute '%! cat ' . g:backgroundCommandOutput
   call setpos('.', save_pos)
   execute('redraw!')
+  execute('set filetype=markdown')
   unlet save_pos
   unlet g:backgroundCommandOutput
 endfunction
@@ -59,9 +60,11 @@ function! RunBackgroundCommand(command)
 endfunction
 
 function! ReadMyCards()
-  " exec('silent ! pass foo/foo')
-  call system('pass foo/foo')
-  exec('redraw!')
+  " ! pass foo/foo
+  " silent ! pass foo/foo
+  " execute("! pass foo/foo")
+  " call system('pass foo/foo')
+  " exec('redraw!')
   call RunBackgroundCommand("clitrello format_my_cards")
 endfunction
 
@@ -69,6 +72,7 @@ nnoremap <Leader>k :call ReadMyCards()<CR>
 nnoremap <Leader>l :call OpenTrelloCard()<CR>
 nnoremap <Leader>L :call OpenTrelloBoard()<CR>
 nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
+nnoremap <Leader>M :! pass foo/foo<CR>
 
 set filetype=markdown
 
