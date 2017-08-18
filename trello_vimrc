@@ -15,8 +15,13 @@ function! OpenTrelloBoard()
   if match(a:line, "^# <.*>") != -1
     let a:link = substitute(a:line, '^.*<\([^>]*\)>.*$', '\1', 'g')
     execute('%! clitrello format_board ' . a:link)
-    execute('redraw')
+    execute('redraw!')
   endif
+endfunction
+
+function! OpenTrelloAllBoards()
+  execute('%! clitrello format_my_boards')
+  execute('redraw!')
 endfunction
 
 
@@ -25,7 +30,7 @@ function! BackgroundCommandClose(channel)
   let save_pos = getpos(".")
   execute '%! cat ' . g:backgroundCommandOutput
   call setpos('.', save_pos)
-  execute('redraw')
+  execute('redraw!')
   unlet save_pos
   unlet g:backgroundCommandOutput
 endfunction
@@ -33,7 +38,11 @@ endfunction
 function! RunBackgroundCommand(command)
   " Make sure we're running VIM version 8 or higher.
   if v:version < 800
-    echoerr 'RunBackgroundCommand requires VIM version 8 or higher'
+    " run task sync
+    let g:save_pos = getpos(".")
+    % ! clitrello my_cards | clitrello format_my_cards
+    call setpos('.', save_pos)
+    " echoerr 'RunBackgroundCommand requires VIM version 8 or higher'
     return
   endif
 
@@ -50,25 +59,21 @@ function! RunBackgroundCommand(command)
 endfunction
 
 function! ReadMyCards()
-  " let g:save_pos = getpos(".")
-  " % ! clitrello my_cards | clitrello format_my_cards
-  " call setpos('.', save_pos)
-  exec('silent ! pass foo/foo')
+  " exec('silent ! pass foo/foo')
+  call system('pass foo/foo')
+  exec('redraw!')
   call RunBackgroundCommand("clitrello format_my_cards")
 endfunction
 
-" nnoremap <Leader>k :% ! clitrello my_cards \| clitrello format_my_cards <CR>
 nnoremap <Leader>k :call ReadMyCards()<CR>
 nnoremap <Leader>l :call OpenTrelloCard()<CR>
 nnoremap <Leader>L :call OpenTrelloBoard()<CR>
+nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
 
 set filetype=markdown
 
-
 if ! empty($custom_vimrc)
-  " source $custom_vimrc
   let g:custom_vimrc=$custom_vimrc
   nnoremap <Leader>r :exec('source ' . g:custom_vimrc)<CR>
-  " echom "source : " . g:custom_vimrc
 endif
 

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+export custom_vimrc=~/sinan/git_repos/trello_cli/trello_vimrc 
+
+clitrello format_my_cards |  vim -c "set filetype=markdown" -
+

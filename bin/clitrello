@@ -83,6 +83,11 @@ elif [ "$1" = "my_boards" ];then
 )"
   echo "$response_json"
 
+elif [ "$1" = "format_my_boards" ];then
+  shift
+  $0 my_boards \
+  | jq -r '"# <\(.shortLink)> \(.name)"'
+  echo
 
 elif [ "$1" = "board" ];then
   shift
