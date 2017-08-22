@@ -2,6 +2,14 @@
 
 export custom_vimrc=~/sinan/git_repos/trello_cli/trello_vimrc 
 
-pass foo/foo
-clitrello format_my_cards |  vim -c "set filetype=markdown" -
+: ${organization_id:="ep2"}
+
+export organization_members="$(clitrello organization_members ${organization_id} | jq -s -c .)"
+export my_boards="$(clitrello my_boards | jq -s -c .)"
+
+vim -c "set filetype=markdown"
+
+# pass foo/foo
+# clitrello format_my_cards 
+# |  vim -c "set filetype=markdown" -
 

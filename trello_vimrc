@@ -10,6 +10,33 @@ function! OpenTrelloCard()
   endif
 endfunction
 
+function! AddTrelloCard()
+  let a:line = getline('.')
+  if match(a:line, "^## <[^>]*>") != -1
+    let a:link = substitute(a:line, '^## <\([^>]*\)>.*$', '\1', 'g')
+    execute('silent !clear;clitrello add_card ' . a:link)
+    execute('redraw!')
+  endif
+endfunction
+
+function! ArchiveTrelloCard()
+  let a:line = getline('.')
+  if match(a:line, "^\* <[^>]*>") != -1
+    let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+    execute('silent !clear;clitrello archive_card ' . a:link)
+    execute('redraw!')
+  endif
+endfunction
+
+function! RenameTrelloCard()
+  let a:line = getline('.')
+  if match(a:line, "^\* <[^>]*>") != -1
+    let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+    execute('silent !clear;clitrello rename_card ' . a:link)
+    execute('redraw!')
+  endif
+endfunction
+
 function! OpenTrelloBoard()
   let a:line = getline('.')
   if match(a:line, "^# <.*>") != -1
@@ -22,6 +49,22 @@ endfunction
 function! OpenTrelloAllBoards()
   execute('%! clitrello format_my_boards')
   execute('redraw!')
+endfunction
+
+function! UpdateBuffer()
+  let a:line = getline(1)
+  if match(a:line, "^# <[^>]*>") != -1
+    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
+    if a:link == "my_cards"
+      call ReadMyCards()
+    else
+      let save_pos = getpos(".")
+      execute('%! clitrello format_board ' . a:link)
+      call setpos('.', save_pos)
+      execute('redraw!')
+      unlet save_pos
+    endif
+  endif
 endfunction
 
 
@@ -60,19 +103,19 @@ function! RunBackgroundCommand(command)
 endfunction
 
 function! ReadMyCards()
-  " ! pass foo/foo
-  " silent ! pass foo/foo
-  " execute("! pass foo/foo")
-  " call system('pass foo/foo')
-  " exec('redraw!')
+  silent ! pass foo/foo
   call RunBackgroundCommand("clitrello format_my_cards")
 endfunction
+
+nnoremap <Leader>u :call UpdateBuffer()<CR>
+nnoremap <Leader>e :call RenameTrelloCard()<CR>
+nnoremap <Leader>c :call ArchiveTrelloCard()<CR>
+nnoremap <Leader>a :call AddTrelloCard()<CR>
 
 nnoremap <Leader>k :call ReadMyCards()<CR>
 nnoremap <Leader>l :call OpenTrelloCard()<CR>
 nnoremap <Leader>L :call OpenTrelloBoard()<CR>
 nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
-nnoremap <Leader>M :! pass foo/foo<CR>
 
 set filetype=markdown
 
