@@ -152,7 +152,7 @@ elif [ "$1" = "format_board" ];then shift
       )"
   fi
   echo "$board" \
-    | jq 'map(.formatted=[]|.formatted+=["\n## <" + .id + "> " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + "[" + (.idMembers|join(",")) + "] " + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring)+"/"+(.badges.checkItems|tostring)+" ") else "" end ) + "`" + .name]|.[] + "`" )])' \
+    | jq 'map(.formatted=[]|.formatted+=["\n## <" + .id + "> " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + "[" + (.idMembers|join(",")) + "] " + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring)+"/"+(.badges.checkItems|tostring)+" ") else "" end ) + (if (.labels|length)>0 then "(" + (.labels|map(.color)|join(","))+ ") " else "" end) + "`" + .name]|.[] + "`" )])' \
     | jq -r 'map(.formatted)|flatten|.[]'
   echo
 
