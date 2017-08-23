@@ -14,6 +14,7 @@ function! AddTrelloCard()
   let a:line = getline('.')
   if match(a:line, "^## <[^>]*>") != -1
     let a:link = substitute(a:line, '^## <\([^>]*\)>.*$', '\1', 'g')
+    silent ! pass foo/foo
     execute('silent !clear;clitrello add_card ' . a:link)
     execute('redraw!')
   endif
@@ -23,6 +24,7 @@ function! ArchiveTrelloCard()
   let a:line = getline('.')
   if match(a:line, "^\* <[^>]*>") != -1
     let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+    silent ! pass foo/foo
     execute('silent !clear;clitrello archive_card ' . a:link)
     execute('redraw!')
   endif
@@ -32,21 +34,36 @@ function! RenameTrelloCard()
   let a:line = getline('.')
   if match(a:line, "^\* <[^>]*>") != -1
     let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
-    execute('silent !clear;clitrello rename_card ' . a:link)
+    let a:old_name = substitute(a:line, '^\* <\([^>]*\)>[^`]*`\([^`]*\)`$', '\2', 'g')
+    silent ! pass foo/foo
+    execute('silent !clear; old_name="' . a:old_name . '" clitrello rename_card ' . a:link)
     execute('redraw!')
   endif
 endfunction
 
 function! OpenTrelloBoard()
   let a:line = getline('.')
-  if match(a:line, "^# <.*>") != -1
-    let a:link = substitute(a:line, '^.*<\([^>]*\)>.*$', '\1', 'g')
-    execute('%! clitrello format_board ' . a:link)
+  if match(a:line, "^# <[^>]*>") != -1
+    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
+    let a:name = substitute(a:line, '^# <\([^>]*\)> \(.*\)$', '\2', 'g')
+    silent ! pass foo/foo
+    execute('%! clitrello format_board ' . a:link . ' ' . a:name)
+    execute('redraw!')
+  endif
+endfunction
+
+function! OpenTrelloListHistory()
+  let a:line = getline('.')
+  if match(a:line, "^## <[^>]*>") != -1
+    let a:link = substitute(a:line, '## <\([^>]*\)>.*$', '\1', 'g')
+    silent ! pass foo/foo
+    execute('%! clitrello list_history ' . a:link)
     execute('redraw!')
   endif
 endfunction
 
 function! OpenTrelloAllBoards()
+  silent ! pass foo/foo
   execute('%! clitrello format_my_boards')
   execute('redraw!')
 endfunction
@@ -59,6 +76,7 @@ function! UpdateBuffer()
       call ReadMyCards()
     else
       let save_pos = getpos(".")
+      silent ! pass foo/foo
       execute('%! clitrello format_board ' . a:link)
       call setpos('.', save_pos)
       execute('redraw!')
@@ -104,6 +122,7 @@ endfunction
 
 function! ReadMyCards()
   silent ! pass foo/foo
+  execute('redraw!')
   call RunBackgroundCommand("clitrello format_my_cards")
 endfunction
 
@@ -113,8 +132,9 @@ nnoremap <Leader>c :call ArchiveTrelloCard()<CR>
 nnoremap <Leader>a :call AddTrelloCard()<CR>
 
 nnoremap <Leader>k :call ReadMyCards()<CR>
-nnoremap <Leader>l :call OpenTrelloCard()<CR>
-nnoremap <Leader>L :call OpenTrelloBoard()<CR>
+nnoremap <Leader>h :call OpenTrelloListHistory()<CR>
+nnoremap <Leader>L :call OpenTrelloCard()<CR>
+nnoremap <Leader>l :call OpenTrelloBoard()<CR>
 nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
 
 set filetype=markdown
