@@ -20,14 +20,16 @@ if [[ "$#" -eq 0 ]];then
 
 elif [ "$1" = "my_cards" ];then shift
   : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
-  response_json="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
+  curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
 &visible=open\
 &members=true\
 &member_fields=initials\
 &actions=commentCard\
 &fields=${card_fields}\
-" \
-)"
+"
+
+elif [ "$1" = "my_cards_by_boards" ];then shift
+  my_cards="$($0 my_cards)"
 
   : ${my_boards=""}
   if [[ -n "$my_boards" ]]; then
@@ -36,7 +38,7 @@ elif [ "$1" = "my_cards" ];then shift
     boards_json="$($0 my_boards | jq -s -c .)"
   fi
 
-  echo "$response_json" \
+  echo "$my_cards" \
   | jq --argjson boards "${boards_json}" \
 "\
 .|group_by(.idBoard)|map(\
@@ -63,7 +65,17 @@ elif [ "$1" = "my_cards" ];then shift
       |sort_by(.due)\
     )\
   }))\
-})"
+})" 
+
+elif [ "$1" = "format_my_cards" ];then shift
+  echo "# <my_cards>"
+  my_cards="$($0 my_cards_by_boards)"
+  echo "$my_cards" \
+  | jq 'map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:"hide",memberCreator:"sinangoo"}])|not))))))' \
+  | jq 'map(.lists=(.lists|map( if ( (.cards|length) == 0 ) then empty else . end   )))|map( if ( (.lists|length)==0) then empty else . end )' \
+  | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  ">    " + .boardName]|.formatted+=[(.lists[]|["## <" + .listId +"> "+.listName,(.cards[]|"* <" + .shortLink + ">      " + (.due//""|sub("T.*$";" ")) + "[" + (.members|join(",")) + "] " + .name )]|.[])])' \
+  | jq -r 'map(.formatted)|flatten|.[]'
+  echo
 
 elif [ "$1" = "add_card" ];then shift
   list_id="$1"; shift
@@ -111,14 +123,6 @@ elif [ "$1" = "rename_card" ];then shift
     -d "name=${card_name}" \
     "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
-elif [ "$1" = "format_my_cards" ];then shift
-  echo "# <my_cards>"
-  $0 my_cards \
-  | jq 'map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:"hide",memberCreator:"sinangoo"}])|not))))))' \
-  | jq 'map(.lists=(.lists|map( if ( (.cards|length) == 0 ) then empty else . end   )))|map( if ( (.lists|length)==0) then empty else . end )' \
-  | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  ">    " + .boardName]|.formatted+=[(.lists[]|["## <" + .listId +"> "+.listName,(.cards[]|"* <" + .shortLink + ">      " + (.due//""|sub("T.*$";" ")) + "[" + (.members|join(",")) + "] " + .name )]|.[])])' \
-  | jq -r 'map(.formatted)|flatten|.[]'
-  echo
 
 elif [ "$1" = "my_boards" ];then shift
   curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
