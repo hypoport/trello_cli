@@ -3,6 +3,7 @@ set -eufo pipefail
 trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
 
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
+# &card_limit=100
 
 while getopts "a:h?" options; do case $options in
   a) a="$OPTARG" ;;
@@ -19,10 +20,6 @@ if [[ "$#" -eq 0 ]];then
 
 elif [ "$1" = "my_cards" ];then shift
   : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
-  # : ${card_fields:="all"}
-  # &members=false\
-  # &member_fields=initials\
-  # &actions=commentCard\
   response_json="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
 &visible=open\
 &members=true\
