@@ -48,6 +48,7 @@ function! OpenTrelloBoard()
     let a:name = substitute(a:line, '^# <\([^>]*\)> \(.*\)$', '\2', 'g')
     silent ! pass foo/foo
     execute('%! clitrello format_board ' . a:link . ' ' . a:name)
+    set filetype=markdown
     execute('redraw!')
   endif
 endfunction
@@ -58,6 +59,7 @@ function! OpenTrelloListHistory()
     let a:link = substitute(a:line, '## <\([^>]*\)>.*$', '\1', 'g')
     silent ! pass foo/foo
     execute('%! clitrello list_history ' . a:link)
+    set filetype=json
     execute('redraw!')
   endif
 endfunction
@@ -65,6 +67,7 @@ endfunction
 function! OpenTrelloAllBoards()
   silent ! pass foo/foo
   execute('%! clitrello format_my_boards')
+  set filetype=markdown
   execute('redraw!')
 endfunction
 
@@ -79,6 +82,7 @@ function! UpdateBuffer()
       silent ! pass foo/foo
       execute('%! clitrello format_board ' . a:link)
       call setpos('.', save_pos)
+      set filetype=markdown
       execute('redraw!')
       unlet save_pos
     endif
