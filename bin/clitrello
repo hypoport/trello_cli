@@ -79,6 +79,14 @@ elif [ "$1" = "add_card" ];then shift
 &name=${card_name}\
 "
 
+elif [ "$1" = "list_history" ];then shift
+  list_id="$1"; shift
+  curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&fields=closed,shortUrl,name\
+&filter=all\
+" \
+| jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
+
 elif [ "$1" = "del_card" ];then shift
   card_id="$1"; shift
   curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
@@ -96,14 +104,14 @@ elif [ "$1" = "card_name" ];then shift
 
 elif [ "$1" = "rename_card" ];then shift
   card_id="$1"; shift
-  card_name="$@"
+  : ${card_name:="$@"}
   if [[ -z "${card_name}" ]];then
-    old_name="$($0 card_name ${card_id} | jq -r ._value )"
+    : ${old_name:="$($0 card_name ${card_id} | jq -r ._value )"}
     read -i "${old_name}" -e -p "enter new card name: " card_name
-    card_name="$(echo "$card_name"|urlencode)"
   fi
+  card_name="$(echo "${card_name}" | urlencode)"
   curl -s -XPUT \
-    -d "name=$card_name" \
+    -d "name=${card_name}" \
     "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
 elif [ "$1" = "format_my_cards" ];then shift
@@ -138,9 +146,10 @@ elif [ "$1" = "board" ];then shift
 
 elif [ "$1" = "format_board" ];then shift
   board_id=$1; shift
+  : ${board_name:="$@"}
   : ${organization_members=""}
   board="$($0 board ${board_id})"
-  echo "# <${board_id}>"
+  echo "# <${board_id}> ${board_name}"
   if [[ -n "$organization_members" ]]; then
     board="$( echo "$board" | jq \
       --argjson members "${organization_members}" \
@@ -166,9 +175,6 @@ elif [ "$1" = "organization_members" ];then shift
   curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
 &fields=initials,username,fullName\
 " | jq -c '.[]' 
-
-elif [ "$1" = "foo" ];then shift
-  read -i "$@" -e -p "foo: " foo
 
 else
   echo "unknown command: $@" >&2
