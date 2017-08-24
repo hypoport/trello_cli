@@ -71,10 +71,48 @@ elif [ "$1" = "format_my_cards" ];then shift
   echo "# <my_cards>"
   my_cards="$($0 my_cards_by_boards)"
   echo "$my_cards" \
-  | jq 'map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:"hide",memberCreator:"sinangoo"}])|not))))))' \
-  | jq 'map(.lists=(.lists|map( if ( (.cards|length) == 0 ) then empty else . end   )))|map( if ( (.lists|length)==0) then empty else . end )' \
-  | jq 'map(.formatted=[]|.formatted+=["\n# <" + .boardLink +  ">    " + .boardName]|.formatted+=[(.lists[]|["## <" + .listId +"> "+.listName,(.cards[]|"* <" + .shortLink + ">      " + (.due//""|sub("T.*$";" ")) + "[" + (.members|join(",")) + "] " + .name )]|.[])])' \
-  | jq -r 'map(.formatted)|flatten|.[]'
+  | jq "map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:\"hide\",memberCreator:\"sinangoo\"}])|not))))))" \
+  | jq "\
+map( \
+  .lists=(.lists| \
+    map( if ((.cards|length)==0) then empty else . end ) \
+  )\
+)| \
+map( \
+  if ((.lists|length)==0) then empty else . end \
+)" \
+  | jq "map(\
+.formatted=[]| \
+.formatted+=[ \
+  \"\\n# <\" \
+  + .boardLink \
+  + \">    \" \
+  + .boardName \
+  ] | \
+.formatted+=[ \
+  (.lists[]| \
+    [ \
+      \"## <\" \
+      + .listId \
+      + \"> \" \
+      + .listName \
+      , \
+      ( \
+        .cards[] | \
+        \"* <\" \
+        + .shortLink \
+        + \">      \" \
+        + (.due//\"\"|sub(\"T.*$\";\" \")) \
+        + \"[\" \
+        + (.members|join(\",\")) \
+        + \"] \" \
+        + .name \
+      ) \
+    ]|.[] \
+  ) \
+] \
+)" \
+  | jq -r "map(.formatted)|flatten|.[]"
   echo
 
 elif [ "$1" = "add_card" ];then shift
