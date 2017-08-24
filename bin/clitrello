@@ -62,7 +62,6 @@ elif [ "$1" = "board_cards" ];then shift ##
   output="$( \
     $0 board_by_id ${board_id} \
     | jq -c 'map(.cards)|flatten' \
-    | $0 cards_idmembers_to_members \
   )"
 
 elif [ "$1" = "boards_by_member" ];then shift
