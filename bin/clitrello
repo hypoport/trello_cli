@@ -56,6 +56,9 @@ elif [ "$1" = "board_by_id" ];then shift
 
 elif [ "$1" = "board_cards" ];then shift ##
   board_id=$1; shift
+  if [[ "$filter" == "visible" ]];then
+    export filter="open"
+  fi
   output="$( \
     $0 board_by_id ${board_id} \
     | jq -c 'map(.cards)|flatten' \
@@ -200,6 +203,9 @@ elif [ "$1" = "list_history" ];then shift
 
 elif [ "$1" = "list_cards" ];then shift ##
   list_id="$1"; shift
+  if [[ "$filter" == "visible" ]];then
+    export filter="open"
+  fi
   output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
 &fields=all\
 &filter=${filter}\
