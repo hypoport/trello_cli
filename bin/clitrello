@@ -111,13 +111,27 @@ elif [ "$1" = "cards_group_by_board" ];then shift
   {\
     id:\$boardId,\
     name:(\$boards|map(select(.id==\$boardId))|first|.name),\
-    shortLink:(\$boards|map(select(.id==\$boardId))|first|.shortLink),\
+    shortLink:(\$boards|map(select(.id==\$boardId))|first|.shortLink//\$boardId)\
+    ,\
     lists:(\
-      (\$boards|map(select(.id==\$boardId))|first|.lists)\
-      |map(\
-        .id as \$idList |\
-        .cards=(\$cards|map(select(.idList==\$idList)))\
-      )\
+      if ((\$boards|length)!=0) then \
+        (\$boards|map(select(.id==\$boardId))|first|.lists//[])\
+        |map(\
+          .id as \$idList |\
+          .cards=(\$cards|map(select(.idList==\$idList)))\
+        )\
+      else \
+        ( \$cards|map(select(.idBoard==\$boardId))|group_by(.idList)  | \
+          map(\
+            .[0].idList as \$listId |\
+            {\
+              id:\$listId,\
+              name:\"\",\
+              cards:(.)\
+            }\
+          )\
+        ) \
+      end \
     )\
   }\
 )\
