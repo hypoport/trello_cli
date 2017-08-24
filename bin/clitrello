@@ -32,11 +32,11 @@ elif [ "$1" = "board_by_id" ];then shift
 
 elif [ "$1" = "board_by_id_cards" ];then shift
   board_id=$1; shift
-  output="$( $0 board_by_id ${board_id} | jq -c 'map(.cards)|flatten' \
-    | $0 cards_idmembers_to_members )"
-
-  # organization_members="$(clitrello organization_members ep2)" 
-  # boards="$(clitrello boards_by_member boards_short_json)" 
+  output="$( \
+    $0 board_by_id ${board_id} \
+    | jq -c 'map(.cards)|flatten' \
+    | $0 cards_idmembers_to_members \
+  )"
 
 elif [ "$1" = "boards_by_member" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
@@ -53,6 +53,7 @@ elif [ "$1" = "boards_to_markdown" ];then shift
 ##================================
 
 elif [ "$1" = "cards_idmembers_to_members" ];then shift
+  # organization_members="$(clitrello organization_members ...)" 
   : ${organization_members="[]"}
   output="$(jq --argjson members "${organization_members}" \
     "map(.members=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId)|.initials)[])))" \
@@ -97,6 +98,7 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
   )"
 
 elif [ "$1" = "cards_group_by_board" ];then shift
+  # boards="$(clitrello boards_by_member boards_short_json)" 
   : ${boards="[]"}
   output="$(jq -c --argjson boards "${boards}" \
 "\
@@ -117,7 +119,33 @@ elif [ "$1" = "cards_group_by_board" ];then shift
       cards:(map(.))\
     }\
   ))\
-})"  )"
+})\
+"  )"
+
+elif [ "$1" = "cards_group_by_board2" ];then shift
+  # boards="$(clitrello boards_by_member boards_short_json)" 
+  : ${boards="[]"}
+  output="$(jq -c --argjson boards "${boards}" \
+"\
+. as \$cards |\
+.|group_by(.idBoard)|map(\
+  .[0].idBoard as \$boardId | \
+  {\
+    boardId:\$boardId,\
+    boardName:(\$boards|map(select(.id==\$boardId)|{name})|first|.name),\
+    boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})|first|.shortLink),\
+    lists:(\
+      (\$boards|map(select(.id==\$boardId))|first|.lists)\
+      |map(\
+        .id as \$idList |\
+        .listId=\$idList |\
+        .listName=.name |\
+        .cards=(\$cards|map(select(.idList==\$idList)))\
+      )\
+    )\
+  }\
+)\
+" )"
 
 ##================================
 
@@ -176,7 +204,7 @@ elif [ "$1" = "rename_card" ];then shift
 elif [ "$1" = "my_organizations" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
 &fields=name,displayName\
-" | jq -c '.[]' )"
+")"
 
 elif [ "$1" = "organization_members" ];then shift
   organization_id=$1; shift
