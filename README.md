@@ -1,15 +1,44 @@
 # trello_cli
 
-
 ## Todos
-* new funktion for: rename list
-* new funktion for: add card after card
-* DONE extend: rename card to get old text as variable
-* board diff to commands
-* keep members even if no initials
-* generic vimscript background command
-* DONE keep title when board open
-* show card details
-* my cards datum filter (not due or due in next 7 days)
 
+### general
+* clean up global vimrc in order to free some leader keys
+* generic function to run background tasks with vimscript with fallback
+* show markdown links as http links in markdown format (-> browser support)
+* DONE get list of joined members of all my organizations
+* keep members even if no initials where found in my member list
+* markdown -> json -> diff with current state -> commands
+
+### new functions
+* add card after card
+* add new list
+* archive list
+* unarchive list
+* unarchive card
+* rename list
+* search cards
+ * in list
+ * in board
+ * closed y/n/a
+ * with action member
+
+### restructure existing functions
+* cards
+* boards
+* list_cards <id>
+* board_cards <id>
+* convert to markdown
+ * filter hidden ...
+ * map members
+ * group by boards
+ * clear empty lists
+ * convert to markdown
+
+### options
+* filter pinned(hidden) by comment: y/n/a
+* (filter by dateLastActivity)
+* show empty lists: y/n
+* custom markdown field: "..."
+* show closed cards: y/n/a
 
