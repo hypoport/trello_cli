@@ -5,12 +5,13 @@ trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
 # &card_limit=100
 
-while getopts "m:f:lech?" options; do case $options in
+while getopts "m:f:lecph?" options; do case $options in
   m) member="$OPTARG" ;;
   f) filter="$OPTARG" ;;
   l) show_last_activity=1 ;;
   c) show_closed=1 ;;
   e) show_empty_list=1 ;;
+  p) show_pinned=1 ;;
   h|?) help; exit ;;
 esac; done; shift $((OPTIND - 1))
 
@@ -21,11 +22,12 @@ esac; done; shift $((OPTIND - 1))
 : ${custom_markdown_fields:=""}
 
 : ${filter:="visible"} # all, closed, none, open, visible
-: ${show_pinned:=""} # yes no
+: ${show_pinned:=0} # yes no
 : ${show_empty_list:=0} # yes no
 
 : ${show_last_activity:=0} # yes no
 : ${show_closed:=0} # yes no
+
 
 if [[ "${show_last_activity}" -eq 1 ]];then
   custom_markdown_fields+=" + (.dateLastActivity|sub(\"T.*$\";\" \"))"
@@ -48,11 +50,11 @@ elif [ "$1" = "board_by_id" ];then shift
   output="$(curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &fields=all\
-&cards=open\
+&cards=${filter}\
 &card_fields=all\
 ")"
 
-elif [ "$1" = "board_by_id_cards" ];then shift
+elif [ "$1" = "board_cards" ];then shift ##
   board_id=$1; shift
   output="$( \
     $0 board_by_id ${board_id} \
@@ -69,8 +71,11 @@ elif [ "$1" = "boards_by_member" ];then shift
 elif [ "$1" = "boards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})')"
 
-elif [ "$1" = "boards_to_markdown" ];then shift
+elif [ "$1" = "boards_markdown" ];then shift ##
   output="$(jq -r 'map("# <\(.shortLink)> \(.name)")[]')"
+
+elif [ "$1" = "boards" ];then shift ##
+  output="$($0 boards_by_member boards_short_json)"
 
 ##================================
 
@@ -78,8 +83,14 @@ elif [ "$1" = "cards_idmembers_to_members" ];then shift
   # organization_members="$(clitrello organization_members ...)" 
   : ${organization_members="[]"}
   output="$(jq --argjson members "${organization_members}" \
-    "map(.members=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId))[])))" \
-  )"
+    "map( \
+if (has(\"members\")) then \
+  . \
+else \
+  .members=(.idMembers//[]|map(. as \$memberId|\$members|map(select(.id==\$memberId))[]))\
+end \
+)\
+" )"
 
 elif [ "$1" = "cards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink})')"
@@ -87,7 +98,21 @@ elif [ "$1" = "cards_short_json" ];then shift
 elif [ "$1" = "cards_filter_hidden" ];then shift
   output="$(jq "map(select(.actions|contains([{data:{text:\"hide\"}}])|not))")"
 
-elif [ "$1" = "cards_by_member" ];then shift
+elif [ "$1" = "cards_markdown" ];then shift ##
+
+  commands=""
+  if [[ "${show_pinned}" -ne 1 ]];then
+    commands+=" cards_filter_hidden"
+  fi
+  commands+=" cards_idmembers_to_members"
+  commands+=" cards_group_by_board"
+  if [[ "${show_empty_list}" -ne 1 ]];then
+    commands+=" cards_grouped_clear_empty_lists"
+  fi
+  commands+=" cards_grouped_to_markdown"
+  $0 $commands
+
+elif [ "$1" = "cards" ];then shift ##
   : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
   # : ${card_fields:="all"}
   output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
@@ -173,6 +198,13 @@ elif [ "$1" = "list_history" ];then shift
 | jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
   )"
 
+elif [ "$1" = "list_cards" ];then shift ##
+  list_id="$1"; shift
+  output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&fields=all\
+&filter=${filter}\
+")"
+
 elif [ "$1" = "list_closed_cards" ];then shift
   list_id="$1"; shift
   output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
@@ -236,7 +268,7 @@ elif [ "$1" = "organization_members" ];then shift
 &fields=initials,username,fullName,status\
 ")"
 
-elif [ "$1" = "known_members" ];then shift
+elif [ "$1" = "known_members" ];then shift ##
   output="$(for organization_id in $( $0 organizations_by_member | jq -r 'map(.id)[]'); do
     $0 organization_members ${organization_id} | jq -c '.[]'
   done \

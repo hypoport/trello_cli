@@ -24,21 +24,22 @@
  * with action member
 
 ### restructure existing functions
-* cards
-* boards
-* list_cards <id>
-* board_cards <id>
-* convert to markdown
- * filter hidden ...
- * map members
- * group by boards
- * clear empty lists
- * convert to markdown
+* DONE cards
+* DONE boards
+* DONE list_cards <id>
+* DONE board_cards <id>
+* DONE convert to markdown
+ * DONE filter hidden ...
+ * DONE map members
+ * DONE group by boards
+ * DONE clear empty lists
+ * DONE convert to markdown
 
 ### options
-* filter pinned(hidden) by comment: y/n/a
+* DONE filter pinned(hidden) by comment: y/n/a
 * (filter by dateLastActivity)
-* show empty lists: y/n
-* custom markdown field: "..."
-* show closed cards: y/n/a
+* DONE show empty lists: y/n
+* DONE custom markdown field: "..."
+* DONE show closed cards: y/n/a
+* sort cards by: pos dateLastActivity due
 
