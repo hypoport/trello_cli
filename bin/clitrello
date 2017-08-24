@@ -200,6 +200,14 @@ elif [ "$1" = "organization_members" ];then shift
 &fields=initials,username,fullName\
 ")"
 
+elif [ "$1" = "known_members" ];then shift
+  output="$(for organization_id in $( $0 organizations_by_member | jq -r 'map(.id)[]'); do
+    $0 organization_members ${organization_id} | jq -c '.[]'
+  done \
+    | sort -u \
+    | jq -s -c . \
+  )"
+
 ##================================
 
 else
