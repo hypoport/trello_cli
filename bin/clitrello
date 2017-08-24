@@ -135,7 +135,7 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
       ( .cards[] | \
         \"* <\" + .shortLink + \">      \" \
         ${custom_markdown_fields} \
-        + \"[\" + (.members//[]|map(.initials?)|flatten|join(\",\")) + \"] \" \
+        + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.initials?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
         + (.due//\"\"|sub(\"T.*$\";\" \")) \
         + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
         + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
