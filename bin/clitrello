@@ -99,7 +99,7 @@ elif [ "$1" = "cards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink})')"
 
 elif [ "$1" = "cards_filter_hidden" ];then shift
-  output="$(jq "map(select(.actions|contains([{data:{text:\"hide\"}}])|not))")"
+  output="$(jq "map(select(.actions//[]|contains([{data:{text:\"hide\"}}])|not))")"
 
 elif [ "$1" = "cards_markdown" ];then shift ##
 
