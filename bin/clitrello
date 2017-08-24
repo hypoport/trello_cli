@@ -14,184 +14,34 @@ esac; done; shift $((OPTIND - 1))
 
 : ${a:="default for var a"}
 : ${member:="me"}
+: ${output:=""}
 
 if [[ "$#" -eq 0 ]];then
   :
 
-elif [ "$1" = "my_cards" ];then shift
-  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
-  curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
-&visible=open\
-&members=true\
-&member_fields=initials\
-&actions=commentCard\
-&fields=${card_fields}\
-"
+##================================
 
-elif [ "$1" = "my_cards_by_boards" ];then shift
-  my_cards="$($0 my_cards)"
-
-  : ${my_boards=""}
-  if [[ -n "$my_boards" ]]; then
-    boards_json="${my_boards}"
-  else
-    boards_json="$($0 my_boards | jq -s -c .)"
-  fi
-
-  echo "$my_cards" \
-  | jq --argjson boards "${boards_json}" \
-"\
-.|group_by(.idBoard)|map(\
-  .[0].idBoard as \$boardId\
-  |{\
-  boardName:(\$boards|map(select(.id==\$boardId)|{name})[0].name),\
-  boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})[0].shortLink),\
-  lists:(.|group_by(.idList)|map(\
-    .[0].idList as \$listId\
-    |{\
-    listId:\$listId,\
-    listName:(\
-      \$boards|map(select(.id==\$boardId))[0].lists\
-      |map(select(.id==\$listId))[0].name\
-    ),\
-    cards:(\
-      map(\
-        del(.idBoard)\
-        |del(.idList)\
-        |del(.id)\
-        |.actions=(.actions|map({text:(.data.text),date,memberCreator:(.memberCreator.username)}))\
-        |.members=[.members[]?|.initials?] \
-      )\
-      |sort_by(.due)\
-    )\
-  }))\
-})" 
-
-elif [ "$1" = "format_my_cards" ];then shift
-  echo "# <my_cards>"
-  my_cards="$($0 my_cards_by_boards)"
-  echo "$my_cards" \
-  | jq "\
-map( \
-.lists=(.lists| \
-map(\
-  .cards=(.cards|\
-    map(\
-    select(.actions|contains([{text:\"hide\",memberCreator:\"sinangoo\"}])|not)\
-    ))\
-))\
-)\
-" \
-  | jq "\
-map( \
-  .lists=(.lists| \
-    map( if ((.cards|length)==0) then empty else . end ) \
-  )\
-)| \
-map( \
-  if ((.lists|length)==0) then empty else . end \
-)" \
-  | jq "map(\
-.formatted=[]| \
-.formatted+=[ \
-  \"\\n# <\" \
-  + .boardLink \
-  + \">    \" \
-  + .boardName \
-  ] | \
-.formatted+=[ \
-  (.lists[]| \
-    [ \
-      \"## <\" \
-      + .listId \
-      + \"> \" \
-      + .listName \
-      , \
-      ( \
-        .cards[] | \
-        \"* <\" \
-        + .shortLink \
-        + \">      \" \
-        + (.due//\"\"|sub(\"T.*$\";\" \")) \
-        + \"[\" \
-        + (.members|join(\",\")) \
-        + \"] \" \
-        + .name \
-      ) \
-    ]|.[] \
-  ) \
-] \
-)" \
-  | jq -r "map(.formatted)|flatten|.[]"
-  echo
-
-elif [ "$1" = "add_card" ];then shift
-  list_id="$1"; shift
-  card_name="$(echo "$@"|urlencode)"
-  if [[ -z "${card_name}" ]];then
-    read -e -p "enter new card name: " card_name
-    card_name="$(echo "$card_name"|urlencode)"
-  fi
-  curl -s -XPOST "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
-&name=${card_name}\
-"
-
-elif [ "$1" = "list_history" ];then shift
-  list_id="$1"; shift
-  curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
-&fields=closed,shortUrl,name\
-&filter=all\
-" \
-| jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
-
-elif [ "$1" = "del_card" ];then shift
-  card_id="$1"; shift
-  curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-
-
-elif [ "$1" = "archive_card" ];then shift
-  card_id="$1"; shift
-  curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
-&value=true\
-"
-
-elif [ "$1" = "card_name" ];then shift
-  card_id="$1"; shift
-  curl -s "https://trello.com/1/cards/${card_id}/name?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "rename_card" ];then shift
-  card_id="$1"; shift
-  : ${card_name:="$@"}
-  if [[ -z "${card_name}" ]];then
-    : ${old_name:="$($0 card_name ${card_id} | jq -r ._value )"}
-    read -i "${old_name}" -e -p "enter new card name: " card_name
-  fi
-  card_name="$(echo "${card_name}" | urlencode)"
-  curl -s -XPUT \
-    -d "name=${card_name}" \
-    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-
-
-elif [ "$1" = "my_boards" ];then shift
-  curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
-&filter=open\
-&lists=open\
-" | jq -c '.[]' \
-  | jq -s -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})|.[]'
-
-elif [ "$1" = "format_my_boards" ];then shift
-  $0 my_boards \
-  | jq -r '"# <\(.shortLink)> \(.name)"'
-  echo
-
-elif [ "$1" = "board" ];then shift
+elif [ "$1" = "board_by_id" ];then shift
   board_id=$1; shift
-  curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
+  output="$(curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &fields=all\
 &cards=open\
 &card_fields=all\
-" 
+")"
+
+elif [ "$1" = "boards_by_member" ];then shift
+  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+")"
+
+elif [ "$1" = "boards_short_json" ];then shift
+  output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})')"
+
+elif [ "$1" = "boards_to_markdown" ];then shift
+  output="$(jq -r 'map("# <\(.shortLink)> \(.name)")[]')"
+
 
 elif [ "$1" = "format_board" ];then shift
   board_id=$1; shift
@@ -235,20 +85,162 @@ map(\
     | jq -r 'map(.formatted)|flatten|.[]'
   echo
 
+##================================
+
+elif [ "$1" = "cards_idmembers_to_members" ];then shift
+  : ${organization_members="[]"}
+  output="$(jq --argjson members "${organization_members}" \
+    "map(.members=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId)|.initials)[])))" \
+  )"
+
+elif [ "$1" = "cards_short_json" ];then shift
+  output="$(jq -c 'map({id,name,shortLink})')"
+
+elif [ "$1" = "cards_filter_hidden" ];then shift
+  output="$(jq "map(select(.actions|contains([{data:{text:\"hide\"}}])|not))")"
+
+elif [ "$1" = "cards_by_member" ];then shift
+  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
+  output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
+&visible=open\
+&members=true\
+&member_fields=initials\
+&actions=commentCard\
+&fields=${card_fields}\
+")"
+
+elif [ "$1" = "cards_grouped_to_markdown" ];then shift
+  output="$(jq "map(\
+.formatted=[]| \
+.formatted+=[ \"\\n# <\" + .boardLink + \">    \" + .boardName ] | \
+.formatted+=[ \
+  (.lists[]| \
+    [ \"## <\" + .listId + \"> \" + .listName, \
+      ( .cards[] | \
+        \"* <\" + .shortLink + \">      \" \
+        + \"[\" + (.members|join(\",\")) + \"] \" \
+        + (.due//\"\"|sub(\"T.*$\";\" \")) \
+        + .name \
+      ) \
+    ]|.[] \
+  ) \
+] \
+)" \
+  | jq -r "map(.formatted)|flatten|.[]"
+  )"
+
+elif [ "$1" = "cards_group_by_board" ];then shift
+  : ${boards="[]"}
+  output="$(jq --argjson boards "${boards}" \
+"\
+.|group_by(.idBoard)|map(\
+  .[0].idBoard as \$boardId\
+  |{\
+  boardId:\$boardId,\
+  boardName:(\$boards|map(select(.id==\$boardId)|{name})|first|.name),\
+  boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})|first|.shortLink),\
+  lists:(.|group_by(.idList)|map(\
+    .[0].idList as \$listId |\
+    {\
+      listId:\$listId,\
+      listName:(\
+        \$boards|map(select(.id==\$boardId))|first|.lists//[]\
+        |map(select(.id==\$listId))[0].name\
+      )\
+      ,\
+      cards:(\
+        map(\
+        . \
+        )\
+        |sort_by(.due)\
+      )\
+    }\
+  ))\
+})"  )"
+          # del(.idBoard)\
+          # |del(.idList)\
+          # |del(.id)\
+          # |.actions=(.actions|map({text:(.data.text),date,memberCreator:(.memberCreator.username)}))\
+          # |.members=[.members[]?|.initials?] \
+
+##================================
+
+elif [ "$1" = "list_history" ];then shift
+  list_id="$1"; shift
+  output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&fields=closed,shortUrl,name\
+&filter=all\
+" \
+| jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
+  )"
+
+##================================
+
+elif [ "$1" = "add_card" ];then shift
+  list_id="$1"; shift
+  card_name="$(echo "$@"|urlencode)"
+  #TODO shift all
+  if [[ -z "${card_name}" ]];then
+    read -e -p "enter new card name: " card_name
+    card_name="$(echo "$card_name"|urlencode)"
+  fi
+  curl -s -XPOST "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&name=${card_name}\
+"
+
+elif [ "$1" = "del_card" ];then shift
+  card_id="$1"; shift
+  curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "archive_card" ];then shift
+  card_id="$1"; shift
+  curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
+&value=true\
+"
+
+elif [ "$1" = "card_name" ];then shift
+  card_id="$1"; shift
+  output="$(curl -s "https://trello.com/1/cards/${card_id}/name?key=${trello_key}&token=${trello_token}")"
+
+elif [ "$1" = "rename_card" ];then shift
+  card_id="$1"; shift
+  : ${card_name:="$@"}
+  #TODO shift all
+  if [[ -z "${card_name}" ]];then
+    : ${old_name:="$($0 card_name ${card_id} | jq -r ._value )"}
+    read -i "${old_name}" -e -p "enter new card name: " card_name
+  fi
+  card_name="$(echo "${card_name}" | urlencode)"
+  curl -s -XPUT \
+    -d "name=${card_name}" \
+    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+
+##================================
+
 elif [ "$1" = "my_organizations" ];then shift
-  curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
+  output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
 &fields=name,displayName\
-" | jq -c '.[]'
+" | jq -c '.[]' )"
 
 elif [ "$1" = "organization_members" ];then shift
   organization_id=$1; shift
-  curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
+  output="$(curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
 &fields=initials,username,fullName\
-" | jq -c '.[]' 
+")"
+
+##================================
 
 else
   echo "unknown command: $@" >&2
   exit 1
 
 fi
+
+if [[ "$#" -ne 0 ]];then
+  # echo "execute $@" >&2
+  echo "$output" | $0 $@
+else
+  echo "$output"
+fi
+
 
