@@ -197,7 +197,7 @@ elif [ "$1" = "organizations_by_member" ];then shift
 elif [ "$1" = "organization_members" ];then shift
   organization_id=$1; shift
   output="$(curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
-&fields=initials,username,fullName\
+&fields=initials,username,fullName,status\
 ")"
 
 elif [ "$1" = "known_members" ];then shift
