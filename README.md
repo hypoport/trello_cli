@@ -9,6 +9,7 @@
 * DONE get list of joined members of all my organizations
 * keep members even if no initials where found in my member list
 * markdown -> json -> diff with current state -> commands
+* if executing list_cards multiple times then all cards should be concated
 
 ### new functions
 * add card after card
