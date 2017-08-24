@@ -46,7 +46,7 @@ function! OpenTrelloBoard()
   if match(a:line, "^# <[^>]*>") != -1
     let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
     silent ! pass foo/foo
-    execute('%! clitrello board_by_id_cards ' . a:link . ' cards_group_by_board cards_grouped_to_markdown')
+    execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
     set filetype=markdown
     execute('redraw!')
   endif
@@ -57,7 +57,7 @@ function! OpenTrelloListHistory()
   if match(a:line, "^## <[^>]*>") != -1
     let a:link = substitute(a:line, '## <\([^>]*\)>.*$', '\1', 'g')
     silent ! pass foo/foo
-    execute('%! custom_markdown_fields="+ (.dateLastActivity|sub(\"T.*$\";\" \"))" clitrello list_closed_cards ' . a:link . ' cards_idmembers_to_members cards_group_by_board cards_grouped_to_markdown')
+    execute('%! clitrello list_cards ' . a:link . ' cards_markdown')
     set filetype=markdown
     execute('redraw!')
   endif
@@ -65,7 +65,7 @@ endfunction
 
 function! OpenTrelloAllBoards()
   silent ! pass foo/foo
-  execute('%! clitrello boards_by_member boards_to_markdown')
+  execute('%! clitrello boards boards_markdown')
   set filetype=markdown
   execute('redraw!')
 endfunction
@@ -79,7 +79,7 @@ function! UpdateBuffer()
     else
       let save_pos = getpos(".")
       silent ! pass foo/foo
-      execute('%! clitrello board_by_id_cards ' . a:link . ' cards_group_by_board cards_grouped_to_markdown')
+      execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
       call setpos('.', save_pos)
       set filetype=markdown
       execute('redraw!')
@@ -105,7 +105,7 @@ function! RunBackgroundCommand(command)
   if v:version < 800
     " run task sync
     let g:save_pos = getpos(".")
-    % ! clitrello cards_by_member cards_filter_hidden cards_group_by_board  cards_grouped_clear_empty_lists cards_grouped_to_markdown
+    % ! clitrello cards cards_markdown
     call setpos('.', save_pos)
     " echoerr 'RunBackgroundCommand requires VIM version 8 or higher'
     return
@@ -126,7 +126,7 @@ endfunction
 function! ReadMyCards()
   silent ! pass foo/foo
   execute('redraw!')
-  call RunBackgroundCommand("clitrello cards_by_member cards_filter_hidden cards_group_by_board  cards_grouped_clear_empty_lists cards_grouped_to_markdown")
+  call RunBackgroundCommand("clitrello cards cards_markdown")
 endfunction
 
 nnoremap <Leader>u :call UpdateBuffer()<CR>
