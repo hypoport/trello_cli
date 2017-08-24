@@ -5,14 +5,13 @@ trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
 # &card_limit=100
 
-while getopts "a:h?" options; do case $options in
-  a) a="$OPTARG" ;;
+while getopts "m:h?" options; do case $options in
+  m) member="$OPTARG" ;;
   h|?) help; exit ;;
 esac; done; shift $((OPTIND - 1))
 
 [[ -r ~/.$(basename ${0})rc ]] && { source ~/.$(basename ${0})rc; }
 
-: ${a:="default for var a"}
 : ${member:="me"}
 : ${output:=""}
 
@@ -76,6 +75,8 @@ elif [ "$1" = "cards_by_member" ];then shift
 ")"
 
 elif [ "$1" = "cards_grouped_to_markdown" ];then shift
+  # : ${custom_markdown_fields:="+ (.dateLastActivity|sub(\"T.*$\";\" \"))"}
+  : ${custom_markdown_fields:=""}
   output="$(jq -r "map(\
 .formatted=[]| \
 .formatted+=[ \"# <\" + .shortLink + \">    \" + .name ] | \
@@ -84,7 +85,8 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
     [ \"## <\" + .id + \"> \" + .name, \
       ( .cards[] | \
         \"* <\" + .shortLink + \">      \" \
-        + \"[\" + (.members|map(.initials)|flatten|join(\",\")) + \"] \" \
+        ${custom_markdown_fields} \
+        + \"[\" + (.members//[]|map(.initials?)|flatten|join(\",\")) + \"] \" \
         + (.due//\"\"|sub(\"T.*$\";\" \")) \
         + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
         + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
@@ -135,6 +137,15 @@ elif [ "$1" = "list_history" ];then shift
 | jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
   )"
 
+elif [ "$1" = "list_closed_cards" ];then shift
+  list_id="$1"; shift
+  output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&fields=all\
+&filter=closed\
+"  \
+| jq -c 'sort_by(.dateLastActivity)|reverse' \
+)"
+
 ##================================
 
 elif [ "$1" = "add_card" ];then shift
@@ -178,7 +189,7 @@ elif [ "$1" = "rename_card" ];then shift
 
 ##================================
 
-elif [ "$1" = "my_organizations" ];then shift
+elif [ "$1" = "organizations_by_member" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
 &fields=name,displayName\
 ")"
