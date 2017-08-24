@@ -5,8 +5,12 @@ trap 'echo "$0: line ${LINENO}: exiting because of error";exit 1' ERR
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
 # &card_limit=100
 
-while getopts "m:h?" options; do case $options in
+while getopts "m:f:lech?" options; do case $options in
   m) member="$OPTARG" ;;
+  f) filter="$OPTARG" ;;
+  l) show_last_activity=1 ;;
+  c) show_closed=1 ;;
+  e) show_empty_list=1 ;;
   h|?) help; exit ;;
 esac; done; shift $((OPTIND - 1))
 
@@ -14,11 +18,30 @@ esac; done; shift $((OPTIND - 1))
 
 : ${member:="me"}
 : ${output:=""}
+: ${custom_markdown_fields:=""}
+
+: ${filter:="visible"} # all, closed, none, open, visible
+: ${show_pinned:=""} # yes no
+: ${show_empty_list:=0} # yes no
+
+: ${show_last_activity:=0} # yes no
+: ${show_closed:=0} # yes no
+
+if [[ "${show_last_activity}" -eq 1 ]];then
+  custom_markdown_fields+=" + (.dateLastActivity|sub(\"T.*$\";\" \"))"
+fi
+if [[ "${show_closed}" -eq 1 ]];then
+  custom_markdown_fields+=" + (.closed|tostring) + \" \""
+fi
+
+export custom_markdown_fields
+export member
+export filter
+export show_empty_list
+export show_pinned
 
 if [[ "$#" -eq 0 ]];then
   :
-
-##================================
 
 elif [ "$1" = "board_by_id" ];then shift
   board_id=$1; shift
@@ -65,9 +88,10 @@ elif [ "$1" = "cards_filter_hidden" ];then shift
   output="$(jq "map(select(.actions|contains([{data:{text:\"hide\"}}])|not))")"
 
 elif [ "$1" = "cards_by_member" ];then shift
-  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList"}
+  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
+  # : ${card_fields:="all"}
   output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
-&visible=open\
+&filter=${filter}\
 &members=true\
 &member_fields=initials\
 &actions=commentCard\
@@ -75,8 +99,6 @@ elif [ "$1" = "cards_by_member" ];then shift
 ")"
 
 elif [ "$1" = "cards_grouped_to_markdown" ];then shift
-  # : ${custom_markdown_fields:="+ (.dateLastActivity|sub(\"T.*$\";\" \"))"}
-  : ${custom_markdown_fields:=""}
   output="$(jq -r "map(\
 .formatted=[]| \
 .formatted+=[ \"# <\" + .shortLink + \">    \" + .name ] | \
@@ -94,8 +116,8 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
       ) \
     ]|.[] \
   ) \
-] | \
-.formatted+=[ \"\\n\" ] \
+] \
+| .formatted+=[ \"\\n\" ] \
 )|\
 map(.formatted)|flatten|.[]\
 " )"
