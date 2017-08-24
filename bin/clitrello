@@ -74,7 +74,7 @@ elif [ "$1" = "boards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})')"
 
 elif [ "$1" = "boards_markdown" ];then shift ##
-  output="$(jq -r 'map("# <\(.shortLink)> \(.name)")[]')"
+  output="$(jq -r 'map("# <\(.shortLink)> `\(.name)`")[]')"
 
 elif [ "$1" = "boards" ];then shift ##
   output="$($0 boards_by_member boards_short_json)"
@@ -128,10 +128,10 @@ elif [ "$1" = "cards" ];then shift ##
 elif [ "$1" = "cards_grouped_to_markdown" ];then shift
   output="$(jq -r "map(\
 .formatted=[]| \
-.formatted+=[ \"# <\" + .shortLink + \">    \" + .name ] | \
+.formatted+=[ \"# <\" + .shortLink + \">    \" + \"\`\" + .name + \"\`\" ] | \
 .formatted+=[ \
   (.lists[]| \
-    [ \"## <\" + .id + \"> \" + .name, \
+    [ \"## <\" + .id + \"> \" + \"\`\" + .name + \"\`\", \
       ( .cards[] | \
         \"* <\" + .shortLink + \">      \" \
         ${custom_markdown_fields} \
