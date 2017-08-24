@@ -45,9 +45,8 @@ function! OpenTrelloBoard()
   let a:line = getline('.')
   if match(a:line, "^# <[^>]*>") != -1
     let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
-    let a:name = substitute(a:line, '^# <\([^>]*\)> \(.*\)$', '\2', 'g')
     silent ! pass foo/foo
-    execute('%! clitrello format_board ' . a:link . ' ' . a:name)
+    execute('%! clitrello board_by_id_cards ' . a:link . ' cards_group_by_board cards_grouped_to_markdown')
     set filetype=markdown
     execute('redraw!')
   endif
@@ -66,7 +65,7 @@ endfunction
 
 function! OpenTrelloAllBoards()
   silent ! pass foo/foo
-  execute('%! clitrello format_my_boards')
+  execute('%! clitrello boards_by_member boards_to_markdown')
   set filetype=markdown
   execute('redraw!')
 endfunction
@@ -80,7 +79,7 @@ function! UpdateBuffer()
     else
       let save_pos = getpos(".")
       silent ! pass foo/foo
-      execute('%! clitrello format_board ' . a:link)
+      execute('%! clitrello board_by_id_cards ' . a:link . ' cards_group_by_board cards_grouped_to_markdown')
       call setpos('.', save_pos)
       set filetype=markdown
       execute('redraw!')
@@ -106,7 +105,7 @@ function! RunBackgroundCommand(command)
   if v:version < 800
     " run task sync
     let g:save_pos = getpos(".")
-    % ! clitrello my_cards | clitrello format_my_cards
+    % ! clitrello cards_by_member cards_filter_hidden cards_group_by_board  cards_grouped_clear_empty_lists cards_grouped_to_markdown
     call setpos('.', save_pos)
     " echoerr 'RunBackgroundCommand requires VIM version 8 or higher'
     return
@@ -127,7 +126,7 @@ endfunction
 function! ReadMyCards()
   silent ! pass foo/foo
   execute('redraw!')
-  call RunBackgroundCommand("clitrello format_my_cards")
+  call RunBackgroundCommand("clitrello cards_by_member cards_filter_hidden cards_group_by_board  cards_grouped_clear_empty_lists cards_grouped_to_markdown")
 endfunction
 
 nnoremap <Leader>u :call UpdateBuffer()<CR>
