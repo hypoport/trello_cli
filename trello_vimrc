@@ -1,13 +1,45 @@
 
-function! OpenTrelloCard()
+function! OpenTrelloExternal()
   let a:line = getline('.')
-  if match(a:line, "^\* <.*>") != -1
-    let a:link = substitute(a:line, '^.*<\([^>]*\)>.*$', '\1', 'g')
+  if match(a:line, "^\* <[^>]*>") != -1
+    let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
     call system ('browser_open_url -f "https://trello.com/c/' . a:link . '"')
-  elseif match(a:line, "^# <.*>") != -1
-    let a:link = substitute(a:line, '^.*<\([^>]*\)>.*$', '\1', 'g')
+  elseif match(a:line, "^# <[^>]*>") != -1
+    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
     call system ('browser_open_url -f "https://trello.com/b/' . a:link . '"')
   endif
+endfunction
+
+function! OpenTrello()
+  let a:line = getline('.')
+  silent ! pass foo/foo
+  if match(a:line, "^\* <[^>]*>") != -1
+    let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+  elseif match(a:line, "^# <[^>]*>") != -1
+    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
+    execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
+  elseif match(a:line, "^## <[^>]*>") != -1
+    let a:link = substitute(a:line, '^## <\([^>]*\)>.*$', '\1', 'g')
+    execute('%! clitrello list_cards ' . a:link . ' cards_markdown')
+  endif
+  set filetype=markdown
+  execute('redraw!')
+endfunction
+
+function! OpenTrelloHistory()
+  let a:line = getline('.')
+  silent ! pass foo/foo
+  if match(a:line, "^\* <[^>]*>") != -1
+    let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+  elseif match(a:line, "^# <[^>]*>") != -1
+    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
+    execute('%! clitrello -f closed -l board_cards ' . a:link . ' cards_markdown')
+  elseif match(a:line, "^## <[^>]*>") != -1
+    let a:link = substitute(a:line, '^## <\([^>]*\)>.*$', '\1', 'g')
+    execute('%! clitrello -f closed -l list_cards ' . a:link . ' cards_markdown')
+  endif
+  set filetype=markdown
+  execute('redraw!')
 endfunction
 
 function! AddTrelloCard()
@@ -39,35 +71,6 @@ function! RenameTrelloCard()
     execute('silent !clear; old_name="' . a:old_name . '" clitrello rename_card ' . a:link)
     execute('redraw!')
   endif
-endfunction
-
-function! OpenTrelloBoard()
-  let a:line = getline('.')
-  if match(a:line, "^# <[^>]*>") != -1
-    let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
-    silent ! pass foo/foo
-    execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
-    set filetype=markdown
-    execute('redraw!')
-  endif
-endfunction
-
-function! OpenTrelloListHistory()
-  let a:line = getline('.')
-  if match(a:line, "^## <[^>]*>") != -1
-    let a:link = substitute(a:line, '## <\([^>]*\)>.*$', '\1', 'g')
-    silent ! pass foo/foo
-    execute('%! clitrello list_cards ' . a:link . ' cards_markdown')
-    set filetype=markdown
-    execute('redraw!')
-  endif
-endfunction
-
-function! OpenTrelloAllBoards()
-  silent ! pass foo/foo
-  execute('%! clitrello boards boards_markdown')
-  set filetype=markdown
-  execute('redraw!')
 endfunction
 
 function! UpdateBuffer()
@@ -129,15 +132,24 @@ function! ReadMyCards()
   call RunBackgroundCommand("clitrello cards cards_markdown")
 endfunction
 
+function! OpenTrelloAllBoards()
+  silent ! pass foo/foo
+  execute('%! clitrello boards boards_markdown')
+  set filetype=markdown
+  execute('redraw!')
+endfunction
+
 nnoremap <Leader>u :call UpdateBuffer()<CR>
+
 nnoremap <Leader>e :call RenameTrelloCard()<CR>
 nnoremap <Leader>c :call ArchiveTrelloCard()<CR>
 nnoremap <Leader>a :call AddTrelloCard()<CR>
 
+nnoremap <Leader>L :call OpenTrelloExternal()<CR>
+nnoremap <Leader>l :call OpenTrello()<CR>
+nnoremap <Leader>h :call OpenTrelloHistory()<CR>
+
 nnoremap <Leader>k :call ReadMyCards()<CR>
-nnoremap <Leader>h :call OpenTrelloListHistory()<CR>
-nnoremap <Leader>L :call OpenTrelloCard()<CR>
-nnoremap <Leader>l :call OpenTrelloBoard()<CR>
 nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
 
 set filetype=markdown
