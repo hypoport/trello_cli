@@ -30,6 +30,14 @@ elif [ "$1" = "board_by_id" ];then shift
 &card_fields=all\
 ")"
 
+elif [ "$1" = "board_by_id_cards" ];then shift
+  board_id=$1; shift
+  output="$( $0 board_by_id ${board_id} | jq -c 'map(.cards)|flatten' \
+    | $0 cards_idmembers_to_members )"
+
+  # organization_members="$(clitrello organization_members ep2)" 
+  # boards="$(clitrello boards_by_member boards_short_json)" 
+
 elif [ "$1" = "boards_by_member" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
 &filter=open\
@@ -41,49 +49,6 @@ elif [ "$1" = "boards_short_json" ];then shift
 
 elif [ "$1" = "boards_to_markdown" ];then shift
   output="$(jq -r 'map("# <\(.shortLink)> \(.name)")[]')"
-
-
-elif [ "$1" = "format_board" ];then shift
-  board_id=$1; shift
-  : ${board_name:="$@"}
-  : ${organization_members=""}
-  board="$($0 board ${board_id})"
-  echo "# <${board_id}> ${board_name}"
-  if [[ -n "$organization_members" ]]; then
-    board="$( echo "$board" | jq \
-      --argjson members "${organization_members}" \
-      "\
-map(.cards=(.cards|sort_by(.pos)|map(\
-.idMembers=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId)|.initials)[] )))))\
-" \
-      )"
-  else
-    board="$( echo "$board" | jq \
-      'map(.cards=(.cards|sort_by(.pos)|map(.idMembers=[(.idMembers|length|tostring)])))' \
-      )"
-  fi
-  echo "$board" \
-    | jq "\
-map(\
-.formatted=[]|\
-.formatted+=[\
-  \"\\n## <\" + .id + \"> \" + .name\
-]|\
-.formatted+=[\
-  (.cards[]|[\
-      \"* <\" + .shortLink + \">  \" \
-      + (.due//\"\"|sub(\"T.*$\";\" \")) \
-      + \"[\" + (.idMembers|join(\",\")) + \"] \" \
-      + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
-      + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
-      + \"\`\"  + .name + \"\`\" \
-    ]|.[] \
-  )\
-]\
-)\
-" \
-    | jq -r 'map(.formatted)|flatten|.[]'
-  echo
 
 ##================================
 
@@ -120,7 +85,9 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
         \"* <\" + .shortLink + \">      \" \
         + \"[\" + (.members|join(\",\")) + \"] \" \
         + (.due//\"\"|sub(\"T.*$\";\" \")) \
-        + .name \
+        + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
+        + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
+        + \"\`\"  + .name + \"\`\" \
       ) \
     ]|.[] \
   ) \
@@ -131,7 +98,7 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
 
 elif [ "$1" = "cards_group_by_board" ];then shift
   : ${boards="[]"}
-  output="$(jq --argjson boards "${boards}" \
+  output="$(jq -c --argjson boards "${boards}" \
 "\
 .|group_by(.idBoard)|map(\
   .[0].idBoard as \$boardId\
@@ -146,22 +113,11 @@ elif [ "$1" = "cards_group_by_board" ];then shift
       listName:(\
         \$boards|map(select(.id==\$boardId))|first|.lists//[]\
         |map(select(.id==\$listId))[0].name\
-      )\
-      ,\
-      cards:(\
-        map(\
-        . \
-        )\
-        |sort_by(.due)\
-      )\
+      ),\
+      cards:(map(.))\
     }\
   ))\
 })"  )"
-          # del(.idBoard)\
-          # |del(.idList)\
-          # |del(.id)\
-          # |.actions=(.actions|map({text:(.data.text),date,memberCreator:(.memberCreator.username)}))\
-          # |.members=[.members[]?|.initials?] \
 
 ##================================
 
