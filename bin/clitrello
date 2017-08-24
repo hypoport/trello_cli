@@ -221,7 +221,7 @@ elif [ "$1" = "list_closed_cards" ];then shift
 
 ##================================
 
-elif [ "$1" = "add_card" ];then shift
+elif [ "$1" = "add_card" ];then shift ##
   list_id="$1"; shift
   card_name="$(echo "$@"|urlencode)"
   #TODO shift all
@@ -237,7 +237,7 @@ elif [ "$1" = "del_card" ];then shift
   card_id="$1"; shift
   curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
-elif [ "$1" = "archive_card" ];then shift
+elif [ "$1" = "archive_card" ];then shift ##
   card_id="$1"; shift
   curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
 &value=true\
@@ -247,7 +247,7 @@ elif [ "$1" = "card_name" ];then shift
   card_id="$1"; shift
   output="$(curl -s "https://trello.com/1/cards/${card_id}/name?key=${trello_key}&token=${trello_token}")"
 
-elif [ "$1" = "rename_card" ];then shift
+elif [ "$1" = "rename_card" ];then shift ##
   card_id="$1"; shift
   : ${card_name:="$@"}
   #TODO shift all
