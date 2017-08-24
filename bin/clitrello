@@ -71,7 +71,17 @@ elif [ "$1" = "format_my_cards" ];then shift
   echo "# <my_cards>"
   my_cards="$($0 my_cards_by_boards)"
   echo "$my_cards" \
-  | jq "map(.lists=(.lists|map(.cards=(.cards|map(select(.actions|contains([{text:\"hide\",memberCreator:\"sinangoo\"}])|not))))))" \
+  | jq "\
+map( \
+.lists=(.lists| \
+map(\
+  .cards=(.cards|\
+    map(\
+    select(.actions|contains([{text:\"hide\",memberCreator:\"sinangoo\"}])|not)\
+    ))\
+))\
+)\
+" \
   | jq "\
 map( \
   .lists=(.lists| \
@@ -192,7 +202,10 @@ elif [ "$1" = "format_board" ];then shift
   if [[ -n "$organization_members" ]]; then
     board="$( echo "$board" | jq \
       --argjson members "${organization_members}" \
-      'map(.cards=(.cards|sort_by(.pos)|map(.idMembers=(.idMembers|map(. as $memberId|$members|map(select(.id==$memberId)|.initials)[] )))))' \
+      "\
+map(.cards=(.cards|sort_by(.pos)|map(\
+.idMembers=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId)|.initials)[] )))))\
+" \
       )"
   else
     board="$( echo "$board" | jq \
@@ -200,7 +213,25 @@ elif [ "$1" = "format_board" ];then shift
       )"
   fi
   echo "$board" \
-    | jq 'map(.formatted=[]|.formatted+=["\n## <" + .id + "> " + .name]|.formatted+=[(.cards[]|["* <" + .shortLink + ">  " + (.due//""|sub("T.*$";" ")) + "[" + (.idMembers|join(",")) + "] " + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring)+"/"+(.badges.checkItems|tostring)+" ") else "" end ) + (if (.labels|length)>0 then "(" + (.labels|map(.color)|join(","))+ ") " else "" end) + "`" + .name]|.[] + "`" )])' \
+    | jq "\
+map(\
+.formatted=[]|\
+.formatted+=[\
+  \"\\n## <\" + .id + \"> \" + .name\
+]|\
+.formatted+=[\
+  (.cards[]|[\
+      \"* <\" + .shortLink + \">  \" \
+      + (.due//\"\"|sub(\"T.*$\";\" \")) \
+      + \"[\" + (.idMembers|join(\",\")) + \"] \" \
+      + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
+      + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
+      + \"\`\"  + .name + \"\`\" \
+    ]|.[] \
+  )\
+]\
+)\
+" \
     | jq -r 'map(.formatted)|flatten|.[]'
   echo
 
