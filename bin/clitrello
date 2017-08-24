@@ -45,44 +45,34 @@ export show_pinned
 if [[ "$#" -eq 0 ]];then
   :
 
-elif [ "$1" = "board_by_id" ];then shift
-  board_id=$1; shift
-  output="$(curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
-&filter=open\
-&fields=all\
-&cards=${filter}\
-&card_fields=all\
-")"
-
 elif [ "$1" = "board_cards" ];then shift ##
   board_id=$1; shift
   if [[ "$filter" == "visible" ]];then
     export filter="open"
   fi
-  output="$( \
-    $0 board_by_id ${board_id} \
-    | jq -c 'map(.cards)|flatten' \
-  )"
-
-elif [ "$1" = "boards_by_member" ];then shift
-  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+  output="$(curl -s "https://trello.com/1/boards/${board_id}/lists?key=${trello_key}&token=${trello_token}\
 &filter=open\
-&lists=open\
-")"
-
-elif [ "$1" = "boards_short_json" ];then shift
-  output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})')"
+&fields=all\
+&cards=${filter}\
+&card_fields=all\
+" \
+  | jq -c 'map(.cards)|flatten' \
+)"
 
 elif [ "$1" = "boards_markdown" ];then shift ##
   output="$(jq -r 'map("# <\(.shortLink)> `\(.name)`")[]')"
 
 elif [ "$1" = "boards" ];then shift ##
-  output="$($0 boards_by_member boards_short_json)"
+  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+" \
+  | jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' \
+)"
 
 ##================================
 
-elif [ "$1" = "cards_idmembers_to_members" ];then shift
-  # organization_members="$(clitrello organization_members ...)" 
+elif [ "$1" = "_cards_idmembers_to_members" ];then shift
   : ${organization_members="[]"}
   output="$(jq --argjson members "${organization_members}" \
     "map( \
@@ -94,24 +84,27 @@ end \
 )\
 " )"
 
-elif [ "$1" = "cards_short_json" ];then shift
+elif [ "$1" = "_cards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink})')"
 
-elif [ "$1" = "cards_filter_hidden" ];then shift
+elif [ "$1" = "_cards_filter_hidden" ];then shift
   output="$(jq "map(select(.actions//[]|contains([{data:{text:\"hide\"}}])|not))")"
+
+elif [ "$1" = "_cards_grouped_clear_empty_lists" ];then shift
+  output="$(jq 'map(.lists=(.lists|map(if ((.cards|length)==0) then del(.)|empty else . end)))')"
 
 elif [ "$1" = "cards_markdown" ];then shift ##
 
   commands=""
   if [[ "${show_pinned}" -ne 1 ]];then
-    commands+=" cards_filter_hidden"
+    commands+=" _cards_filter_hidden"
   fi
-  commands+=" cards_idmembers_to_members"
-  commands+=" cards_group_by_board"
+  commands+=" _cards_idmembers_to_members"
+  commands+=" _cards_group_by_board"
   if [[ "${show_empty_list}" -ne 1 ]];then
-    commands+=" cards_grouped_clear_empty_lists"
+    commands+=" _cards_grouped_clear_empty_lists"
   fi
-  commands+=" cards_grouped_to_markdown"
+  commands+=" _cards_grouped_to_markdown"
   $0 $commands
 
 elif [ "$1" = "cards" ];then shift ##
@@ -125,32 +118,7 @@ elif [ "$1" = "cards" ];then shift ##
 &fields=${card_fields}\
 ")"
 
-elif [ "$1" = "cards_grouped_to_markdown" ];then shift
-  output="$(jq -r "map(\
-.formatted=[]| \
-.formatted+=[ \"# <\" + .shortLink + \">    \" + \"\`\" + .name + \"\`\" ] | \
-.formatted+=[ \
-  (.lists[]| \
-    [ \"## <\" + .id + \"> \" + \"\`\" + .name + \"\`\", \
-      ( .cards[] | \
-        \"* <\" + .shortLink + \">      \" \
-        ${custom_markdown_fields} \
-        + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.initials?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
-        + (.due//\"\"|sub(\"T.*$\";\" \")) \
-        + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
-        + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
-        + \"\`\"  + .name + \"\`\" \
-      ) \
-    ]|.[] \
-  ) \
-] \
-| .formatted+=[ \"\\n\" ] \
-)|\
-map(.formatted)|flatten|.[]\
-" )"
-
-elif [ "$1" = "cards_group_by_board" ];then shift
-  # boards="$(clitrello boards_by_member boards_short_json)" 
+elif [ "$1" = "_cards_group_by_board" ];then shift
   : ${boards="[]"}
   output="$(jq -c --argjson boards "${boards}" \
 "\
@@ -186,19 +154,32 @@ elif [ "$1" = "cards_group_by_board" ];then shift
 )\
 " )"
 
-elif [ "$1" = "cards_grouped_clear_empty_lists" ];then shift
-  output="$(jq 'map(.lists=(.lists|map(if ((.cards|length)==0) then del(.)|empty else . end)))')"
+elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
+  output="$(jq -r "map(\
+.formatted=[]| \
+.formatted+=[ \"# <\" + .shortLink + \">    \" + \"\`\" + .name + \"\`\" ] | \
+.formatted+=[ \
+  (.lists[]| \
+    [ \"## <\" + .id + \"> \" + \"\`\" + .name + \"\`\", \
+      ( .cards[] | \
+        \"* <\" + .shortLink + \">      \" \
+        ${custom_markdown_fields} \
+        + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.initials?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
+        + (.due//\"\"|sub(\"T.*$\";\" \")) \
+        + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
+        + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
+        + \"\`\"  + .name + \"\`\" \
+      ) \
+    ]|.[] \
+  ) \
+] \
+| .formatted+=[ \"\\n\" ] \
+)|\
+map(.formatted)|flatten|.[]\
+" )"
+
 
 ##================================
-
-elif [ "$1" = "list_history" ];then shift
-  list_id="$1"; shift
-  output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
-&fields=closed,shortUrl,name\
-&filter=all\
-" \
-| jq -c 'sort_by(.closed)|map({closed,shortUrl,name})[]'
-  )"
 
 elif [ "$1" = "list_cards" ];then shift ##
   list_id="$1"; shift
@@ -209,15 +190,6 @@ elif [ "$1" = "list_cards" ];then shift ##
 &fields=all\
 &filter=${filter}\
 ")"
-
-elif [ "$1" = "list_closed_cards" ];then shift
-  list_id="$1"; shift
-  output="$(curl -s "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
-&fields=all\
-&filter=closed\
-"  \
-| jq -c 'sort_by(.dateLastActivity)|reverse' \
-)"
 
 ##================================
 
@@ -233,7 +205,7 @@ elif [ "$1" = "add_card" ];then shift ##
 &name=${card_name}\
 "
 
-elif [ "$1" = "del_card" ];then shift
+elif [ "$1" = "_del_card" ];then shift
   card_id="$1"; shift
   curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
@@ -243,7 +215,7 @@ elif [ "$1" = "archive_card" ];then shift ##
 &value=true\
 "
 
-elif [ "$1" = "card_name" ];then shift
+elif [ "$1" = "_card_name" ];then shift
   card_id="$1"; shift
   output="$(curl -s "https://trello.com/1/cards/${card_id}/name?key=${trello_key}&token=${trello_token}")"
 
@@ -262,20 +234,20 @@ elif [ "$1" = "rename_card" ];then shift ##
 
 ##================================
 
-elif [ "$1" = "organizations_by_member" ];then shift
+elif [ "$1" = "_organizations_by_member" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
 &fields=name,displayName\
 ")"
 
-elif [ "$1" = "organization_members" ];then shift
+elif [ "$1" = "_organization_members" ];then shift
   organization_id=$1; shift
   output="$(curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
 &fields=initials,username,fullName,status\
 ")"
 
 elif [ "$1" = "known_members" ];then shift ##
-  output="$(for organization_id in $( $0 organizations_by_member | jq -r 'map(.id)[]'); do
-    $0 organization_members ${organization_id} | jq -c '.[]'
+  output="$(for organization_id in $( $0 _organizations_by_member | jq -r 'map(.id)[]'); do
+    $0 _organization_members ${organization_id} | jq -c '.[]'
   done \
     | sort -u \
     | jq -s -c . \
