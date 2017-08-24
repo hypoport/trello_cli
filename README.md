@@ -12,6 +12,7 @@
 * if executing list_cards multiple times then all cards should be concated
 
 ### new functions
+* show card details
 * add card after card
 * add new list
 * archive list
