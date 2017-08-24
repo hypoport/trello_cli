@@ -94,23 +94,22 @@ endfunction
 
 " This callback will be executed when the entire command is completed
 function! BackgroundCommandClose(channel)
-  let save_pos = getpos(".")
+  let a:save_pos = getpos(".")
   execute '%! cat ' . g:backgroundCommandOutput
-  call setpos('.', save_pos)
+  call setpos('.', a:save_pos)
   execute('redraw!')
   execute('set filetype=markdown')
-  unlet save_pos
+  unlet a:save_pos
   unlet g:backgroundCommandOutput
 endfunction
 
 function! RunBackgroundCommand(command)
   " Make sure we're running VIM version 8 or higher.
+  " RunBackgroundCommand requires VIM version 8 or higher
   if v:version < 800
-    " run task sync
     let g:save_pos = getpos(".")
-    % ! clitrello cards cards_markdown
-    call setpos('.', save_pos)
-    " echoerr 'RunBackgroundCommand requires VIM version 8 or higher'
+    execute('% ! ' . a:command)
+    call setpos('.', g:save_pos)
     return
   endif
 
