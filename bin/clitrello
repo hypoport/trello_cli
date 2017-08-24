@@ -78,7 +78,7 @@ elif [ "$1" = "cards_by_member" ];then shift
 elif [ "$1" = "cards_grouped_to_markdown" ];then shift
   output="$(jq -r "map(\
 .formatted=[]| \
-.formatted+=[ \"\\n# <\" + .shortLink + \">    \" + .name ] | \
+.formatted+=[ \"# <\" + .shortLink + \">    \" + .name ] | \
 .formatted+=[ \
   (.lists[]| \
     [ \"## <\" + .id + \"> \" + .name, \
@@ -92,7 +92,8 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
       ) \
     ]|.[] \
   ) \
-] \
+] | \
+.formatted+=[ \"\\n\" ] \
 )|\
 map(.formatted)|flatten|.[]\
 " )"
@@ -202,5 +203,4 @@ if [[ "$#" -ne 0 ]];then
 else
   echo "$output"
 fi
-
 
