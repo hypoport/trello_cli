@@ -57,8 +57,8 @@ function! OpenTrelloListHistory()
   if match(a:line, "^## <[^>]*>") != -1
     let a:link = substitute(a:line, '## <\([^>]*\)>.*$', '\1', 'g')
     silent ! pass foo/foo
-    execute('%! clitrello list_history ' . a:link)
-    set filetype=json
+    execute('%! custom_markdown_fields="+ (.dateLastActivity|sub(\"T.*$\";\" \"))" clitrello list_closed_cards ' . a:link . ' cards_idmembers_to_members cards_group_by_board cards_grouped_to_markdown')
+    set filetype=markdown
     execute('redraw!')
   endif
 endfunction
