@@ -56,7 +56,7 @@ elif [ "$1" = "cards_idmembers_to_members" ];then shift
   # organization_members="$(clitrello organization_members ...)" 
   : ${organization_members="[]"}
   output="$(jq --argjson members "${organization_members}" \
-    "map(.members=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId)|.initials)[])))" \
+    "map(.members=(.idMembers|map(. as \$memberId|\$members|map(select(.id==\$memberId))[])))" \
   )"
 
 elif [ "$1" = "cards_short_json" ];then shift
@@ -76,15 +76,15 @@ elif [ "$1" = "cards_by_member" ];then shift
 ")"
 
 elif [ "$1" = "cards_grouped_to_markdown" ];then shift
-  output="$(jq "map(\
+  output="$(jq -r "map(\
 .formatted=[]| \
-.formatted+=[ \"\\n# <\" + .boardLink + \">    \" + .boardName ] | \
+.formatted+=[ \"\\n# <\" + .shortLink + \">    \" + .name ] | \
 .formatted+=[ \
   (.lists[]| \
-    [ \"## <\" + .listId + \"> \" + .listName, \
+    [ \"## <\" + .id + \"> \" + .name, \
       ( .cards[] | \
         \"* <\" + .shortLink + \">      \" \
-        + \"[\" + (.members|join(\",\")) + \"] \" \
+        + \"[\" + (.members|map(.initials)|flatten|join(\",\")) + \"] \" \
         + (.due//\"\"|sub(\"T.*$\";\" \")) \
         + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
         + (if (.labels|length)>0 then \"(\" + (.labels|map(.color)|join(\",\"))+ \") \" else \"\" end) \
@@ -93,36 +93,11 @@ elif [ "$1" = "cards_grouped_to_markdown" ];then shift
     ]|.[] \
   ) \
 ] \
-)" \
-  | jq -r "map(.formatted)|flatten|.[]"
-  )"
+)|\
+map(.formatted)|flatten|.[]\
+" )"
 
 elif [ "$1" = "cards_group_by_board" ];then shift
-  # boards="$(clitrello boards_by_member boards_short_json)" 
-  : ${boards="[]"}
-  output="$(jq -c --argjson boards "${boards}" \
-"\
-.|group_by(.idBoard)|map(\
-  .[0].idBoard as \$boardId\
-  |{\
-  boardId:\$boardId,\
-  boardName:(\$boards|map(select(.id==\$boardId)|{name})|first|.name),\
-  boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})|first|.shortLink),\
-  lists:(.|group_by(.idList)|map(\
-    .[0].idList as \$listId |\
-    {\
-      listId:\$listId,\
-      listName:(\
-        \$boards|map(select(.id==\$boardId))|first|.lists//[]\
-        |map(select(.id==\$listId))[0].name\
-      ),\
-      cards:(map(.))\
-    }\
-  ))\
-})\
-"  )"
-
-elif [ "$1" = "cards_group_by_board2" ];then shift
   # boards="$(clitrello boards_by_member boards_short_json)" 
   : ${boards="[]"}
   output="$(jq -c --argjson boards "${boards}" \
@@ -131,21 +106,22 @@ elif [ "$1" = "cards_group_by_board2" ];then shift
 .|group_by(.idBoard)|map(\
   .[0].idBoard as \$boardId | \
   {\
-    boardId:\$boardId,\
-    boardName:(\$boards|map(select(.id==\$boardId)|{name})|first|.name),\
-    boardLink:(\$boards|map(select(.id==\$boardId)|{shortLink})|first|.shortLink),\
+    id:\$boardId,\
+    name:(\$boards|map(select(.id==\$boardId))|first|.name),\
+    shortLink:(\$boards|map(select(.id==\$boardId))|first|.shortLink),\
     lists:(\
       (\$boards|map(select(.id==\$boardId))|first|.lists)\
       |map(\
         .id as \$idList |\
-        .listId=\$idList |\
-        .listName=.name |\
         .cards=(\$cards|map(select(.idList==\$idList)))\
       )\
     )\
   }\
 )\
 " )"
+
+elif [ "$1" = "cards_grouped_clear_empty_lists" ];then shift
+  output="$(jq 'map(.lists=(.lists|map(if ((.cards|length)==0) then del(.)|empty else . end)))')"
 
 ##================================
 
