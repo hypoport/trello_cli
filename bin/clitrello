@@ -118,6 +118,13 @@ elif [ "$1" = "cards" ];then shift ##
 &actions=commentCard\
 &fields=${card_fields}\
 ")"
+  
+elif [ "$1" = "card" ];then shift ##
+  card_id="$1"; shift
+  output="$(curl -s "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}\
+&actions=commentCard\
+&checklists=all\
+")"
 
 elif [ "$1" = "_cards_group_by_board" ];then shift
   : ${boards="[]"}

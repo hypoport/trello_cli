@@ -15,14 +15,17 @@ function! OpenTrello()
   silent ! pass foo/foo
   if match(a:line, "^\* <[^>]*>") != -1
     let a:link = substitute(a:line, '^\* <\([^>]*\)>.*$', '\1', 'g')
+    execute('%! clitrello card ' . a:link . ' | jq . ')
+    set filetype=json
   elseif match(a:line, "^# <[^>]*>") != -1
     let a:link = substitute(a:line, '^# <\([^>]*\)>.*$', '\1', 'g')
     execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
+    set filetype=markdown
   elseif match(a:line, "^## <[^>]*>") != -1
     let a:link = substitute(a:line, '^## <\([^>]*\)>.*$', '\1', 'g')
     execute('%! clitrello list_cards ' . a:link . ' cards_markdown')
+    set filetype=markdown
   endif
-  set filetype=markdown
   execute('redraw!')
 endfunction
 
