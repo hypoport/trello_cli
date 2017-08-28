@@ -1,3 +1,35 @@
+" This callback will be executed when the entire command is completed
+function! BackgroundCommandClose(channel)
+  let a:save_pos = getpos(".")
+  execute '%! cat ' . g:backgroundCommandOutput
+  call setpos('.', a:save_pos)
+  execute('redraw!')
+  execute('set filetype=markdown')
+  unlet a:save_pos
+  unlet g:backgroundCommandOutput
+endfunction
+
+function! RunBackgroundCommand(command)
+  " Make sure we're running VIM version 8 or higher.
+  " RunBackgroundCommand requires VIM version 8 or higher
+  if v:version < 800
+    let g:save_pos = getpos(".")
+    execute('% ! ' . a:command)
+    call setpos('.', g:save_pos)
+    return
+  endif
+
+  if exists('g:backgroundCommandOutput')
+    echo 'Already running task in background'
+  else
+    echo 'Running task in background'
+    " Launch the job.
+    " Notice that we're only capturing out, and not err here. This is because, for some reason, the callback
+    " will not actually get hit if we write err out to the same file. Not sure if I'm doing this wrong or?
+    let g:backgroundCommandOutput = tempname()
+    call job_start(a:command, {'close_cb': 'BackgroundCommandClose', 'out_io': 'file', 'out_name': g:backgroundCommandOutput})
+  endif
+endfunction
 
 function! OpenTrelloExternal()
   let a:line = getline('.')
@@ -84,49 +116,21 @@ function! UpdateBuffer()
       call ReadMyCards()
     else
       let save_pos = getpos(".")
+      " silent ! pass foo/foo
+      " execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
+      " call setpos('.', save_pos)
+      " set filetype=markdown
+      " execute('redraw!')
+      " unlet save_pos
+
       silent ! pass foo/foo
-      execute('%! clitrello board_cards ' . a:link . ' cards_markdown')
-      call setpos('.', save_pos)
-      set filetype=markdown
       execute('redraw!')
-      unlet save_pos
+      call RunBackgroundCommand('clitrello board_cards ' . a:link . ' cards_markdown')
+
     endif
   endif
 endfunction
 
-
-" This callback will be executed when the entire command is completed
-function! BackgroundCommandClose(channel)
-  let a:save_pos = getpos(".")
-  execute '%! cat ' . g:backgroundCommandOutput
-  call setpos('.', a:save_pos)
-  execute('redraw!')
-  execute('set filetype=markdown')
-  unlet a:save_pos
-  unlet g:backgroundCommandOutput
-endfunction
-
-function! RunBackgroundCommand(command)
-  " Make sure we're running VIM version 8 or higher.
-  " RunBackgroundCommand requires VIM version 8 or higher
-  if v:version < 800
-    let g:save_pos = getpos(".")
-    execute('% ! ' . a:command)
-    call setpos('.', g:save_pos)
-    return
-  endif
-
-  if exists('g:backgroundCommandOutput')
-    echo 'Already running task in background'
-  else
-    echo 'Running task in background'
-    " Launch the job.
-    " Notice that we're only capturing out, and not err here. This is because, for some reason, the callback
-    " will not actually get hit if we write err out to the same file. Not sure if I'm doing this wrong or?
-    let g:backgroundCommandOutput = tempname()
-    call job_start(a:command, {'close_cb': 'BackgroundCommandClose', 'out_io': 'file', 'out_name': g:backgroundCommandOutput})
-  endif
-endfunction
 
 function! ReadMyCards()
   silent ! pass foo/foo
