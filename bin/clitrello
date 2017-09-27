@@ -109,8 +109,8 @@ elif [ "$1" = "cards_markdown" ];then shift ##
   $0 $commands
 
 elif [ "$1" = "cards" ];then shift ##
-  : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
-  # : ${card_fields:="all"}
+  # : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
+  : ${card_fields:="all"}
   output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
 &filter=${filter}\
 &members=true\
