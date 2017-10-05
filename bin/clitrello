@@ -126,6 +126,22 @@ elif [ "$1" = "card" ];then shift ##
 &checklists=all\
 ")"
 
+elif [ "$1" = "comment" ];then shift ##
+  card_id="$1"; shift
+
+  if [[ -n "$@" ]]; then
+    comment="$@"
+    shift $#
+  else
+    read -p 'enter comment: ' comment
+  fi
+  output=$(curl \
+    -s \
+    -X POST \
+    -d "text=$comment" \
+    "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
+  )
+
 elif [ "$1" = "_cards_group_by_board" ];then shift
   : ${boards="[]"}
   #TODO sort cards by field
