@@ -28,6 +28,7 @@ esac; done; shift $((OPTIND - 1))
 
 : ${show_last_activity:=0} # yes no
 : ${show_closed:=0} # yes no
+: ${show_comments:=""} # yes no
 
 if [[ "${show_last_activity}" -eq 1 ]];then
   custom_markdown_fields+=" + (.dateLastActivity|sub(\"T.*$\";\" \"))"
@@ -124,6 +125,7 @@ elif [ "$1" = "card" ];then shift ##
   output="$(curl -s "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}\
 &actions=commentCard\
 &checklists=all\
+&fields=all\
 ")"
 
 elif [ "$1" = "comment" ];then shift ##
@@ -181,7 +183,7 @@ elif [ "$1" = "_cards_group_by_board" ];then shift
 " )"
 
 elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
-  output="$(jq -r "map(\
+  output="$(jq -r --arg show_comments "$show_comments" "map(\
 .formatted=[]| \
 .formatted+=[ \"# <\" + .shortLink + \">    \" + \"\`\" + .name + \"\`\" ] | \
 .formatted+=[ \
@@ -195,6 +197,7 @@ elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
         + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
         + (if (.labels|length)>0 then \"(\" + (.labels|map(.name)|join(\",\"))+ \") \" else \"\" end) \
         + \"\`\"  + .name + \"\`\" \
+        + (if ((.actions|length)>0 and (\$show_comments!=\"\")) then \"\\n\" + (.actions|map(select(.type==\"commentCard\")|\"                    \(.date|sub(\"T.*\$\";\"\")) \(.data.text)\")|join(\"\\n\")) else \"\" end) \
       ) \
     ]|.[] \
   ) \
@@ -204,6 +207,7 @@ elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
 map(.formatted)|flatten|.[]\
 " )"
 
+        # + (if (.actions|length)>0 then \"\\n\" + (.actions|map(select(.type==\"commentCard\")|\"                    \(.date|sub(\"T.*\$\";\"\")) \(.data.text)\")|join(\"\\n\")) else \"\" end) \
 
 ##================================
 
