@@ -139,7 +139,8 @@ elif [ "$1" = "comment" ];then shift ##
     -s \
     -X POST \
     -d "text=$comment" \
-    "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
+    "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}" \
+    | jq -r '.id'
   )
 
 elif [ "$1" = "_cards_group_by_board" ];then shift
