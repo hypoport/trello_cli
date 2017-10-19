@@ -195,7 +195,7 @@ elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
         + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.${member_array_field}?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
         + (.due//\"\"|sub(\"T.*$\";\" \")) \
         + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
-        + (if (.labels|length)>0 then \"(\" + (.labels|map(.name)|join(\",\"))+ \") \" else \"\" end) \
+        + (if (.labels|length)>0 then \"(\" + (.labels|map(if .name == \"\" then .color else .name end)|join(\",\"))+ \") \" else \"\" end) \
         + \"\`\"  + .name + \"\`\" \
         + (if ((.actions|length)>0 and (\$show_comments!=\"\")) then \"\\n\" + (.actions|map(select(.type==\"commentCard\")|\"                    \(.date|sub(\"T.*\$\";\"\")) \(.data.text)\")|join(\"\\n\")) else \"\" end) \
       ) \
