@@ -282,6 +282,25 @@ elif [ "$1" = "rename_card" ];then shift ##
     -d "name=${card_name}" \
     "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
+elif [ "$1" = "card_desc_edit" ];then shift ##
+  card_id="$1"; shift
+  $0 card ${card_id} | jq -r '.desc' | vipe | $0 card_desc ${card_id}
+
+elif [ "$1" = "card_desc" ];then shift ##
+  card_id="$1"; shift
+  if [[ -p /dev/stdin ]]; then
+    : ${description:="$(cat)"}
+  else
+    : ${description:="$@"}
+    shift $#
+  fi
+  description="$(echo "${description}" | urlencode)"
+  output="$(curl -s -XPUT \
+    -d "desc=${description}" \
+    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
+    | jq -r '.id'
+  )"
+
 ##================================
 
 elif [ "$1" = "_organizations_by_member" ];then shift
