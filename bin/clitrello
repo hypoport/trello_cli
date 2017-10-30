@@ -90,7 +90,18 @@ elif [ "$1" = "_cards_short_json" ];then shift
   output="$(jq -c 'map({id,name,shortLink})')"
 
 elif [ "$1" = "_cards_filter_hidden" ];then shift
-  output="$(jq "map(select(.actions//[]|contains([{data:{text:\"hide\"}}])|not))")"
+  output="$(jq "\
+    map(\
+      select(\
+        .actions//[]\
+        |\
+        contains([{data:{text:\"hide\"}}])\
+        or \
+        contains([{data:{text:\"cli_treloo_filter:hide\"}}])\
+        |not\
+      )\
+    )\
+    ")"
 
 elif [ "$1" = "_cards_grouped_clear_empty_lists" ];then shift
   output="$(jq 'map(.lists=(.lists|map(if ((.cards|length)==0) then del(.)|empty else . end)))')"
