@@ -138,6 +138,12 @@ function! ReadMyCards()
   call RunBackgroundCommand("clitrello cards cards_markdown")
 endfunction
 
+function! ReadMyUrgentCards()
+  silent ! pass foo/foo
+  execute('redraw!')
+  call RunBackgroundCommand("clitrello urgent")
+endfunction
+
 function! OpenTrelloAllBoards()
   silent ! pass foo/foo
   execute('%! clitrello boards boards_markdown')
@@ -155,6 +161,7 @@ nnoremap <Leader>L :call OpenTrelloExternal()<CR>
 nnoremap <Leader>l :call OpenTrello()<CR>
 nnoremap <Leader>h :call OpenTrelloHistory()<CR>
 
+nnoremap <Leader>K :call ReadMyUrgentCards()<CR>
 nnoremap <Leader>k :call ReadMyCards()<CR>
 nnoremap <Leader>m :call OpenTrelloAllBoards()<CR>
 

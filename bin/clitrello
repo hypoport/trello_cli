@@ -130,7 +130,16 @@ elif [ "$1" = "cards" ];then shift ##
 &actions=commentCard\
 &fields=${card_fields}\
 ")"
-  
+
+elif [ "$1" = "filter_due_date" ];then shift ##
+  : ${max_due_date:="$(date +%F)T23:59:59"}
+  output="$(
+    jq --arg max_due_date "${max_due_date}" 'map(select(.due<=$max_due_date and .due != null))'
+  )"
+
+elif [ "$1" = "urgent" ];then shift ##
+  max_due_date="$(gdate -d "+ 3 day" +%F)" $0 cards filter_due_date cards_markdown 
+
 elif [ "$1" = "card" ];then shift ##
   card_id="$1"; shift
   output="$(curl -s "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}\
