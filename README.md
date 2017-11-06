@@ -4,7 +4,6 @@
 
 ### general
 * clean up global vimrc in order to free some leader keys
-* DONE generic function to run background tasks with vimscript with fallback
 * show markdown links as http links in markdown format (-> browser support)
 * DONE get list of joined members of all my organizations
 * keep members even if no initials where found in my member list
