@@ -135,7 +135,7 @@ endfunction
 function! ReadMyCards()
   silent ! pass foo/foo
   execute('redraw!')
-  call RunBackgroundCommand("clitrello cards cards_markdown")
+  call RunBackgroundCommand("clitrello -p cards cards_markdown")
 endfunction
 
 function! ReadMyUrgentCards()
