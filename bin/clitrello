@@ -246,7 +246,7 @@ elif [ "$1" = "list_cards" ];then shift ##
 elif [ "$1" = "add_card" ];then shift ##
   list_id="$1"; shift
   card_name="$(echo "$@"|urlencode)"
-  #TODO shift all
+  shift $#
   if [[ -z "${card_name}" ]];then
     read -e -p "enter new card name: " card_name
     card_name="$(echo "$card_name"|urlencode)"
