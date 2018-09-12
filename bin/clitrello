@@ -69,8 +69,18 @@ elif [ "$1" = "boards" ];then shift ##
 &filter=open\
 &lists=open\
 &fields=all\
+&list_fields=all\
 " \
   | jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' \
+)"
+
+elif [ "$1" = "json_boards" ];then shift ##
+  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+&fields=all\
+&list_fields=all\
+" 
 )"
 
 elif [ "$1" = "cards" ];then shift ##
@@ -278,6 +288,23 @@ elif [ "$1" = "comment" ];then shift ##
     | jq -r '.id'
   )
 
+elif [ "$1" = "update_cards_from_json" ];then shift ##
+  while read line; do
+    id="$(jq -r ".id" <<<"$line")"
+    jq -e 'has("name")' >/dev/null <<<"$line" \
+      && $0 setname ${id} $(jq -r '.name' <<<"$line")
+    jq -e 'has("tags")' >/dev/null <<<"$line" \
+      && $0 tag_set ${id} $(jq -r '.tags' <<<"$line")
+  done
+
+elif [ "$1" = "create_json_card" ];then shift ##
+  curl \
+    -s -XPOST \
+    --data-urlencode "idList=5b996ad07b5d687ee534d426" \
+    --data-urlencode "name=blbbbb" \
+    "https://trello.com/1/cards?key=${trello_key}&token=${trello_token}\
+"
+
 elif [ "$1" = "add_card" ];then shift ##
   list_id="$1"; shift
   card_name="$(echo "$@"|urlencode)"
@@ -335,6 +362,27 @@ elif [ "$1" = "tag_add" ];then shift ##
   fi
 
   jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
+  | curl -s -XPUT \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "tag_set" ];then shift ##
+  card_id="$1"; shift
+  tag="$1"; shift
+  card_data="$($0 card $card_id)"
+  custom_field_data="$(jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' <<<"${card_data}")"
+
+  if [[ "${custom_field_data}" == "null" ]];then
+    id_board="$(jq -r '.idBoard' <<<"${card_data}")"
+    custom_field_id="$(curl -s "https://trello.com/1/boards/${id_board}/customFields?key=${trello_key}&token=${trello_token}" \
+      | jq -r 'map(select(.name=="tags"))|first|.id//null')"
+  else
+    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
+  fi
+  new_custom_field_value="${tag}"
+
+  jq -n --arg value "${tag}" '{value:{text:$value}}' \
   | curl -s -XPUT \
     -H "Content-Type: application/json" \
     --data-binary @- \
@@ -415,8 +463,8 @@ fi
 
 if [[ "$#" -ne 0 ]];then
   # echo "execute $@" >&2
-  echo "$output" | $0 $@
+  echo -n "$output" | $0 $@
 else
-  echo "$output"
+  echo -n "$output"
 fi
 
