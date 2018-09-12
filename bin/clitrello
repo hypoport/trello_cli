@@ -55,12 +55,25 @@ elif [[ "$1" == "help" ]];then shift ##
     | sed -e 's/^\( *\)\([^;]*\); *shift$/\1\2/g' \
     || true
 
-elif [ "$1" = "board_cards" ];then shift ##
+elif [ "$1" = "cards" ];then shift ##
   board_id=$1; shift
-  if [[ "$filter" == "visible" ]];then
-    export filter="open"
-  fi
-  output="$(curl -s "https://trello.com/1/boards/${board_id}/cards?key=${trello_key}&token=${trello_token}\
+  if [[ "${board_id}" == "member" ]];then
+    # : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
+    : ${card_fields:="all"}
+    output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
+&filter=${filter}\
+&members=true\
+&member_fields=initials,username\
+&actions=commentCard\
+&fields=${card_fields}\
+&checklists=all\
+&customFieldItems=true\
+")"
+  else
+    if [[ "$filter" == "visible" ]];then
+      export filter="open"
+    fi
+    output="$(curl -s "https://trello.com/1/boards/${board_id}/cards?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &fields=all\
 &cards=${filter}\
@@ -72,6 +85,7 @@ elif [ "$1" = "board_cards" ];then shift ##
 " \
   | jq -c '.' \
 )"
+  fi
 
 elif [ "$1" = "markdown" ];then shift ##
   input="$(cat -)"
@@ -164,18 +178,6 @@ elif [ "$1" = "cards_markdown" ];then shift
   commands+=" _cards_grouped_to_markdown"
   $0 $commands
 
-elif [ "$1" = "cards" ];then shift ##
-  # : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
-  : ${card_fields:="all"}
-  output="$(curl -s "https://trello.com/1/members/${member}/cards?key=${trello_key}&token=${trello_token}\
-&filter=${filter}\
-&members=true\
-&member_fields=initials,username\
-&actions=commentCard\
-&fields=${card_fields}\
-&checklists=all\
-&customFieldItems=true\
-")"
 
 elif [ "$1" = "filter_due_date" ];then shift ##
   : ${max_due_date:="$(date +%F)T23:59:59"}
@@ -315,27 +317,38 @@ elif [ "$1" = "setname" ];then shift ##
     -d "name=${card_name}" \
     "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
-elif [ "$1" = "remove_tag" ];then shift ##
+elif [ "$1" = "tag_del" ];then shift ##
   card_id="$1"; shift
   tag="$1"; shift
   custom_field_data="$($0 card $card_id | jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' )"
-  custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
-  custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
-  new_custom_field_value="$(echo "$custom_field_value_text" | sed -e "s/${tag}//g" -e "s/,,/,/g" -e "s/^,$//g" -e "s/,$//g" )"
+  if [[ "${custom_field_data}" != "null" ]];then
+    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
+    custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
+    new_custom_field_value="$(echo "$custom_field_value_text" | sed -e "s/${tag}//g" -e "s/,,/,/g" -e "s/^,$//g" -e "s/,$//g" )"
 
-  jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
-  | curl -s -XPUT \
-    -H "Content-Type: application/json" \
-    --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+    jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
+    | curl -s -XPUT \
+      -H "Content-Type: application/json" \
+      --data-binary @- \
+      "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+  fi
 
-elif [ "$1" = "add_tag" ];then shift ##
+elif [ "$1" = "tag_add" ];then shift ##
   card_id="$1"; shift
   tag="$1"; shift
-  custom_field_data="$($0 card $card_id | jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' )"
-  custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
-  custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
-  new_custom_field_value="${custom_field_value_text:+"${custom_field_value_text},"}${tag}"
+  card_data="$($0 card $card_id)"
+  custom_field_data="$(jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' <<<"${card_data}")"
+
+  if [[ "${custom_field_data}" == "null" ]];then
+    id_board="$(jq -r '.idBoard' <<<"${card_data}")"
+    custom_field_id="$(curl -s "https://trello.com/1/boards/${id_board}/customFields?key=${trello_key}&token=${trello_token}" \
+      | jq -r 'map(select(.name=="tags"))|first|.id//null')"
+    new_custom_field_value="${tag}"
+  else
+    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
+    custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
+    new_custom_field_value="${custom_field_value_text:+"${custom_field_value_text},"}${tag}"
+  fi
 
   jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
   | curl -s -XPUT \
