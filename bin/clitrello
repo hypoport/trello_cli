@@ -288,14 +288,29 @@ elif [ "$1" = "comment" ];then shift ##
     | jq -r '.id'
   )
 
-elif [ "$1" = "update_cards_from_json" ];then shift ##
-  while read line; do
+elif [ "$1" = "update_card_from_json" ];then shift ##
+  line="$(cat -)"
     id="$(jq -r ".id" <<<"$line")"
-    jq -e 'has("name")' >/dev/null <<<"$line" \
-      && $0 setname ${id} $(jq -r '.name' <<<"$line")
-    jq -e 'has("tags")' >/dev/null <<<"$line" \
-      && $0 tag_set ${id} $(jq -r '.tags' <<<"$line")
-  done
+    name="$(jq -r ".name" <<<"$line")"
+    tags="$(jq -r ".tags" <<<"$line")"
+    if [[ -n "${name}" ]];then
+      $0 setname ${id} ${name} &
+    fi
+    if [[ -n "${tags}" ]];then
+      $0 tag_set ${id} ${tags} &
+    fi
+    wait
+
+elif [ "$1" = "update_cards_from_json" ];then shift ##
+  parallel -j5 -N1 --pipe "$0 update_card_from_json"
+
+elif [ "$1" = "test_line" ];then shift ##
+  in="$(cat -)"
+  sleep 1
+  echo ">>${in}"
+
+elif [ "$1" = "test_lines" ];then shift ##
+  parallel -j3 -N1 --pipe "$0 test_line"
 
 elif [ "$1" = "create_json_card" ];then shift ##
   curl \
