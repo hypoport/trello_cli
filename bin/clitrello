@@ -375,7 +375,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   # fi
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
-  parallel -j15 -N1 --pipe "$0 update_card_from_json"
+  parallel -j8 -N1 --pipe "$0 update_card_from_json"
 
 # elif [ "$1" = "test_line" ];then shift ##
 #   in="$(cat -)"
@@ -533,6 +533,10 @@ elif [ "$1" = "card_desc" ];then shift ##
     "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
     | jq -r '.id'
   )"
+
+elif [ "$1" = "member" ];then shift
+  curl -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
+  exit
 
 elif [ "$1" = "_organizations_by_member" ];then shift
   output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
