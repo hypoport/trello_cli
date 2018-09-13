@@ -113,7 +113,7 @@ elif [ "$1" = "board_custom_field_prio_id_value" ];then shift ##
       --arg field_name "prio" \
       --arg value "${prio}" \
       -r \
-      'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))|first|.id//null'
+      'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))|first|.id//""'
         )"
 
 # elif [ "$1" = "board_custom_field_id_by_name_prio" ];then shift ##
@@ -349,8 +349,10 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   card_id="$(jq -r ".id" <<<"$line")"
   name="$(jq -r ".name" <<<"$line")"
   idList="$(jq -r ".idList" <<<"$line")"
-  tags="$(jq -r ".tags" <<<"$line")"
-  priority="$(jq -r ".priority" <<<"$line")"
+  tags="$(jq -r ".tags//\"\"" <<<"$line")"
+  priority="$(jq -r ".priority//\"\"" <<<"$line")"
+
+  # echo "update card: ${name}" >&2
   if [[ -n "${name}" ]];then
     curl \
       -s -XPUT \
@@ -363,12 +365,14 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     #due
 
   fi
-  if [[ -n "${tags}" ]];then
-    $0 tag_set ${card_id} ${tags}
-  fi
-  if [[ -n "${priority}" ]];then
-    $0 prio_set ${card_id} ${priority}
-  fi
+  # if [[ -n "${tags}" ]];then
+    # echo "update tags for: ${name} with tags: ${tags}" >&2
+    $0 tag_set ${card_id} "${tags}"
+  # fi
+  # if [[ -n "${priority}" ]];then
+    # echo "update tags for: ${name} with prio: ${priority}" >&2
+    $0 prio_set ${card_id} "${priority}"
+  # fi
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j15 -N1 --pipe "$0 update_card_from_json"
@@ -459,7 +463,7 @@ elif [ "$1" = "prio_set" ];then shift ##
     board_id="$(jq -r '.idBoard' <<<"${card_data}")"
   fi
   custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
-  idValue="$($0 board_custom_field_prio_id_value ${board_id} ${prio})"
+  idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
   jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
   | curl -s -XPUT \
     -H "Content-Type: application/json" \
