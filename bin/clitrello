@@ -104,8 +104,34 @@ elif [ "$1" = "board_custom_field_id_by_name" ];then shift ##
       'map(select(.name==$field_name))|first|.id//null'
         )"
 
+elif [ "$1" = "board_custom_field_prio_id_value" ];then shift ##
+  board_id=$1; shift
+  prio=$1; shift
+  output="$(
+  $0 board_custom_fields ${board_id} \
+    | jq \
+      --arg field_name "prio" \
+      --arg value "${prio}" \
+      -r \
+      'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))|first|.id//null'
+        )"
+
+# elif [ "$1" = "board_custom_field_id_by_name_prio" ];then shift ##
+#   board_id=$1; shift
+#   field_name=$1; shift
+#   value=$1; shift
+#   output="$(
+#   $0 board_custom_fields ${board_id} \
+#     | jq \
+#       --arg field_name "${field_name}" \
+#       --arg value "${value}" \
+#       -r \
+#       'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))'
+#         )"
+#
+
 elif [ "$1" = "cache_clear" ];then shift ##
-  rm -f ${trello_cache_dir}/*.json
+  find ${trello_cache_dir} -type f -name "*.json" -delete
 
 elif [ "$1" = "cache_show" ];then shift ##
   ls -1 ${trello_cache_dir}
@@ -324,6 +350,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   name="$(jq -r ".name" <<<"$line")"
   idList="$(jq -r ".idList" <<<"$line")"
   tags="$(jq -r ".tags" <<<"$line")"
+  priority="$(jq -r ".priority" <<<"$line")"
   if [[ -n "${name}" ]];then
     curl \
       -s -XPUT \
@@ -337,9 +364,11 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
 
   fi
   if [[ -n "${tags}" ]];then
-    $0 tag_set ${card_id} ${tags} &
+    $0 tag_set ${card_id} ${tags}
   fi
-  wait
+  if [[ -n "${priority}" ]];then
+    $0 prio_set ${card_id} ${priority}
+  fi
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j15 -N1 --pipe "$0 update_card_from_json"
@@ -417,6 +446,21 @@ elif [ "$1" = "tag_add" ];then shift ##
   fi
 
   jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
+  | curl -s -XPUT \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "prio_set" ];then shift ##
+  card_id="$1"; shift
+  prio="$1"; shift
+  if [[ -z "${board_id:-""}" ]];then
+    card_data="$($0 card $card_id)"
+    board_id="$(jq -r '.idBoard' <<<"${card_data}")"
+  fi
+  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
+  idValue="$($0 board_custom_field_prio_id_value ${board_id} ${prio})"
+  jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
   | curl -s -XPUT \
     -H "Content-Type: application/json" \
     --data-binary @- \
