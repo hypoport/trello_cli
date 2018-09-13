@@ -12,6 +12,8 @@ if [[ "${trace:=0}" -eq 1 ]];then
 fi
 
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
+# https://developers.trello.com/docs/getting-started-custom-fields
+
 # &card_limit=100
 
 while getopts "m:f:lecph?" options; do case $options in
@@ -318,19 +320,24 @@ elif [ "$1" = "comment" ];then shift ##
 
 elif [ "$1" = "update_card_from_json" ];then shift ##
   line="$(cat -)"
-    id="$(jq -r ".id" <<<"$line")"
-    name="$(jq -r ".name" <<<"$line")"
-    tags="$(jq -r ".tags" <<<"$line")"
-    if [[ -n "${name}" ]];then
-      $0 setname ${id} ${name} &
-    fi
-    if [[ -n "${tags}" ]];then
-      $0 tag_set ${id} ${tags} &
-    fi
-    wait
+  card_id="$(jq -r ".id" <<<"$line")"
+  name="$(jq -r ".name" <<<"$line")"
+  idList="$(jq -r ".idList" <<<"$line")"
+  tags="$(jq -r ".tags" <<<"$line")"
+  if [[ -n "${name}" ]];then
+    curl \
+      -s -XPUT \
+      --data-urlencode "idList=${idList}" \
+      --data-urlencode "name=${name}" \
+      "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+  fi
+  if [[ -n "${tags}" ]];then
+    $0 tag_set ${card_id} ${tags} &
+  fi
+  wait
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
-  parallel -j5 -N1 --pipe "$0 update_card_from_json"
+  parallel -j15 -N1 --pipe "$0 update_card_from_json"
 
 elif [ "$1" = "test_line" ];then shift ##
   in="$(cat -)"
