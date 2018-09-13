@@ -373,6 +373,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     # echo "update tags for: ${name} with prio: ${priority}" >&2
     $0 prio_set ${card_id} "${priority}"
   # fi
+  $0 check_rate
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j8 -N1 --pipe "$0 update_card_from_json"
@@ -534,8 +535,24 @@ elif [ "$1" = "card_desc" ];then shift ##
     | jq -r '.id'
   )"
 
+elif [ "$1" = "check_rate" ];then shift
+  rate_limit_remaining="$(
+    curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}" \
+      | grep x-rate-limit-api-token-remaining \
+      | awk -F':' '{print $2}' \
+      | tr -d ' ' \
+      | tr -d '\r'
+  )"
+  echo "rate_limit: >${rate_limit_remaining}<"
+  if [[ ${rate_limit_remaining} -lt 30 ]];then
+    echo "rate limit is too low wait 10s"
+    sleep 10
+  fi
+
 elif [ "$1" = "member" ];then shift
-  curl -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
+  curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
+  # curl -o /dev/null -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
+  # curl -o /dev/null -w "%{http_code}" -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
   exit
 
 elif [ "$1" = "_organizations_by_member" ];then shift
