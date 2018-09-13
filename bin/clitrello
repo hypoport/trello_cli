@@ -64,24 +64,52 @@ elif [[ "$1" == "help" ]];then shift ##
     | sed -e 's/^\( *\)\([^;]*\); *shift$/\1\2/g' \
     || true
 
-elif [ "$1" = "boards" ];then shift ##
-  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
-&filter=open\
-&lists=open\
-&fields=all\
-&list_fields=all\
-" \
-  | jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' \
-)"
+elif [ "$1" = "test" ];then shift ##
+  :
+  if [[ -z "${board_id:-""}" ]];then
+    echo "no board id"
+    : ${board_id:="aaa"}
+  fi
+  echo "board_id:${board_id}"
 
-elif [ "$1" = "json_boards" ];then shift ##
-  output="$(curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+elif [ "$1" = "boards" ];then shift ##
+  if [[ ! -r "${trello_cache_dir}/boards.json" ]];then
+      curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &lists=open\
 &fields=all\
 &list_fields=all\
-" 
-)"
+"  > ${trello_cache_dir}/boards.json
+  fi
+  output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
+
+elif [ "$1" = "board_custom_fields" ];then shift ##
+  board_id=$1; shift
+  if [[ ! -r "${trello_cache_dir}/board_${board_id}_custom_fields.json" ]];then
+    curl -s "https://trello.com/1/boards/${board_id}/customFields?key=${trello_key}&token=${trello_token}"  \
+      > ${trello_cache_dir}/board_${board_id}_custom_fields.json
+  fi
+  output="$( jq '.' ${trello_cache_dir}/board_${board_id}_custom_fields.json)"
+
+elif [ "$1" = "board_custom_field_id_by_name" ];then shift ##
+  board_id=$1; shift
+  field_name=$1; shift
+  output="$(
+  $0 board_custom_fields ${board_id} \
+    | jq \
+      --arg field_name "${field_name}" \
+      -r \
+      'map(select(.name==$field_name))|first|.id//null'
+        )"
+
+elif [ "$1" = "cache_clear" ];then shift ##
+  rm -f ${trello_cache_dir}/*.json
+
+elif [ "$1" = "cache_show" ];then shift ##
+  ls -1 ${trello_cache_dir}
+
+# elif [ "$1" = "cache_update" ];then shift ##
+#   ${0} boards 
 
 elif [ "$1" = "cards" ];then shift ##
   board_id=$1; shift
@@ -154,7 +182,6 @@ elif [ "$1" = "text" ];then shift ##
   echo "$input" | jq -e 'map(has("lists"))|.[0]==true' >/dev/null && command="boards_text" || command="cards_text" 
   echo "$input" | $0 $command
 
-
 elif [ "$1" = "boards_markdown" ];then shift
   output="$(jq -r 'map("# <\(.shortLink)> `\(.name)`")[]')"
 
@@ -173,9 +200,9 @@ elif [ "$1" = "cards_markdown" ];then shift
 elif [ "$1" = "cards_text" ];then shift
   commands=""
   commands+=" _cards_group_by_board"
-  # if [[ "${show_empty_list}" -ne 1 ]];then
-  #   commands+=" _cards_grouped_clear_empty_lists"
-  # fi
+  if [[ "${show_empty_list}" -ne 1 ]];then
+    commands+=" _cards_grouped_clear_empty_lists"
+  fi
   commands+=" _cards_grouped_to_text"
   $0 $commands
 
@@ -184,7 +211,8 @@ elif [ "$1" = "_cards_grouped_clear_empty_lists" ];then shift
 
 
 elif [ "$1" = "_cards_group_by_board" ];then shift
-  : ${boards="[]"}
+  # : ${boards="[]"}
+  boards="$($0 boards)"
   #TODO sort cards by field
   output="$(jq -c --argjson boards "${boards}" \
 "\
@@ -384,20 +412,15 @@ elif [ "$1" = "tag_add" ];then shift ##
 
 elif [ "$1" = "tag_set" ];then shift ##
   card_id="$1"; shift
-  tag="$1"; shift
-  card_data="$($0 card $card_id)"
-  custom_field_data="$(jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' <<<"${card_data}")"
-
-  if [[ "${custom_field_data}" == "null" ]];then
-    id_board="$(jq -r '.idBoard' <<<"${card_data}")"
-    custom_field_id="$(curl -s "https://trello.com/1/boards/${id_board}/customFields?key=${trello_key}&token=${trello_token}" \
-      | jq -r 'map(select(.name=="tags"))|first|.id//null')"
-  else
-    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
+  tags="$1"; shift
+  if [[ -z "${custom_field_id:-""}" ]];then
+    if [[ -z "${board_id:-""}" ]];then
+      card_data="$($0 card $card_id)"
+      board_id="$(jq -r '.idBoard' <<<"${card_data}")"
+    fi
+    custom_field_id="$($0 board_custom_field_id_by_name ${board_id} tags)"
   fi
-  new_custom_field_value="${tag}"
-
-  jq -n --arg value "${tag}" '{value:{text:$value}}' \
+  jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
   | curl -s -XPUT \
     -H "Content-Type: application/json" \
     --data-binary @- \
@@ -478,8 +501,8 @@ fi
 
 if [[ "$#" -ne 0 ]];then
   # echo "execute $@" >&2
-  echo -n "$output" | $0 $@
+  echo "$output" | $0 $@
 else
-  echo -n "$output"
+  echo "$output"
 fi
 
