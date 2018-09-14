@@ -252,7 +252,16 @@ elif [ "$1" = "boards_markdown" ];then shift
   output="$(jq -r 'map("# <\(.shortLink)> `\(.name)`")[]')"
 
 elif [ "$1" = "boards_text" ];then shift
-  output="$(jq -r 'map("\(.shortLink) \(.name)")[]')"
+  output="$(jq -r "map(\
+.formatted=[]| \
+.formatted+=[ .shortLink + \" \" + .name ] | \
+.formatted+=[ \
+  (.lists[]|[\"  \"+.id+\" \"+.name ]|.[]) \
+] \
+| .formatted+=[ \"\\n\" ] \
+)|\
+map(.formatted)|flatten|.[]\
+" )"
 
 elif [ "$1" = "cards_markdown" ];then shift
   commands=""
@@ -385,7 +394,7 @@ elif [ "$1" = "comment" ];then shift ##
 elif [ "$1" = "update_card_from_json" ];then shift ##
   line="$(cat -)"
   card_id="$(jq -r ".id" <<<"$line")"
-  name="$(jq -r ".name" <<<"$line")"
+  name="$(jq -r '.name|gsub("^ ";"")|gsub(" $";"")' <<<"$line")"
   idList="$(jq -r ".idList" <<<"$line")"
   tags="$(jq -r ".tags//\"\"" <<<"$line")"
   priority="$(jq -r ".priority//\"\"" <<<"$line")"
