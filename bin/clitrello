@@ -84,6 +84,44 @@ elif [ "$1" = "boards" ];then shift ##
 "  > ${trello_cache_dir}/boards.json
   fi
   output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
+  
+elif [ "$1" = "board_list_map" ];then shift ##
+  board_id=$1; shift
+  output="$($0 board ${board_id} | jq -c 'first|.lists|map({id,name})')"
+
+elif [ "$1" = "list_name_map" ];then shift ##
+  output="$($0 boards | jq -c 'map(.id as $board_id|.lists|map({id,name,board_id:$board_id}))|flatten')"
+
+elif [ "$1" = "list_name" ];then shift ##
+  list_id=$1; shift
+  output="$($0 boards | jq -r --arg list_id "${list_id}" 'map(select(.lists|contains([{id:$list_id}]))|.lists|map(select(contains({id:$list_id}))|.name)|first)|first')"
+
+elif [ "$1" = "list_id" ];then shift ##
+  board_id=$1; shift
+  list_name=$1; shift
+  if [[ "${#board_id}" -eq 24 ]];then
+    board_key="id"
+  else
+    board_key="shortLink"
+  fi
+  output="$($0 boards | jq -r --arg board_key "${board_key}" --arg board_id "${board_id}" --arg list_name "${list_name}" 'map(select(.[$board_key]==$board_id))|first|.lists//[]|map(select(.name|gsub(" ";"_")|test($list_name;"i"))|.id)[]')"
+
+elif [ "$1" = "board" ];then shift ##
+  board_id=$1; shift
+  if [[ ! -r "${trello_cache_dir}/boards.json" ]];then
+      curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
+&filter=open\
+&lists=open\
+&fields=all\
+&list_fields=all\
+"  > ${trello_cache_dir}/boards.json
+  fi
+  if [[ "${#board_id}" -eq 24 ]];then
+    board_key="id"
+  else
+    board_key="shortLink"
+  fi
+  output="$(jq --arg board_key "${board_key}" --arg board_id "${board_id}" -c 'map(select(.[$board_key] == $board_id))' ${trello_cache_dir}/boards.json)"
 
 elif [ "$1" = "board_custom_fields" ];then shift ##
   board_id=$1; shift
@@ -113,7 +151,7 @@ elif [ "$1" = "board_custom_field_prio_id_value" ];then shift ##
       --arg field_name "prio" \
       --arg value "${prio}" \
       -r \
-      'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))|first|.id//""'
+      'map(select(.name==$field_name))|first|.options//[]|map(select(.value.text==$value))|first|.id//""'
         )"
 
 # elif [ "$1" = "board_custom_field_id_by_name_prio" ];then shift ##
