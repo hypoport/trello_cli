@@ -352,9 +352,11 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   tags="$(jq -r ".tags//\"\"" <<<"$line")"
   priority="$(jq -r ".priority//\"\"" <<<"$line")"
 
-  # echo "update card: ${name}" >&2
+  wait_time=15 limit=20 $0 check_rate
+  # echo "update card: ${name}"
   if [[ -n "${name}" ]];then
     curl \
+      -o /dev/null -w "%{http_code}\n" \
       -s -XPUT \
       --data-urlencode "idList=${idList}" \
       --data-urlencode "name=${name}" \
@@ -373,7 +375,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     # echo "update tags for: ${name} with prio: ${priority}" >&2
     $0 prio_set ${card_id} "${priority}"
   # fi
-  $0 check_rate
+  wait_time=5 limit=50 $0 check_rate
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j8 -N1 --pipe "$0 update_card_from_json"
@@ -467,6 +469,7 @@ elif [ "$1" = "prio_set" ];then shift ##
   idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
   jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
   | curl -s -XPUT \
+    -o /dev/null -w "%{http_code}\n" \
     -H "Content-Type: application/json" \
     --data-binary @- \
     "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
@@ -483,6 +486,7 @@ elif [ "$1" = "tag_set" ];then shift ##
   fi
   jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
   | curl -s -XPUT \
+    -o /dev/null -w "%{http_code}\n" \
     -H "Content-Type: application/json" \
     --data-binary @- \
     "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
@@ -536,22 +540,28 @@ elif [ "$1" = "card_desc" ];then shift ##
   )"
 
 elif [ "$1" = "check_rate" ];then shift
-  rate_limit_remaining="$(
+  : ${limit:="60"}
+  : ${wait_time:="10"}
+  rate_limit_remaining="$( 
     curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}" \
-      | grep x-rate-limit-api-token-remaining \
+      | grep -i "x-rate-limit-api-token-remaining" \
       | awk -F':' '{print $2}' \
       | tr -d ' ' \
-      | tr -d '\r'
+      | tr -d '\r' \
+      || true
   )"
-  echo "rate_limit: >${rate_limit_remaining}<"
-  if [[ ${rate_limit_remaining} -lt 30 ]];then
-    echo "rate limit is too low wait 10s"
-    sleep 10
+  echo "rate_limit: ${rate_limit_remaining}"
+  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+    echo "rate limit is below ${limit} wait ${wait_time}"
+    sleep ${wait_time} 
   fi
 
 elif [ "$1" = "member" ];then shift
-  curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
+  curl -o /dev/null -w "%{http_code}\n" -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
   # curl -o /dev/null -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
+
+
+
   # curl -o /dev/null -w "%{http_code}" -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
   exit
 
