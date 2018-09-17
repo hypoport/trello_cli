@@ -66,14 +66,6 @@ elif [[ "$1" == "help" ]];then shift ##
     | sed -e 's/^\( *\)\([^;]*\); *shift$/\1\2/g' \
     || true
 
-elif [ "$1" = "test" ];then shift ##
-  :
-  if [[ -z "${board_id:-""}" ]];then
-    echo "no board id"
-    : ${board_id:="aaa"}
-  fi
-  echo "board_id:${board_id}"
-
 elif [ "$1" = "boards" ];then shift ##
   if [[ ! -r "${trello_cache_dir}/boards.json" ]];then
       curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
@@ -83,61 +75,79 @@ elif [ "$1" = "boards" ];then shift ##
 &list_fields=all\
 "  > ${trello_cache_dir}/boards.json
   fi
-  output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
+  output="$(jq -c '.' ${trello_cache_dir}/boards.json)"
+  # output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
 
-elif [ "$1" = "board_name_to_shortlink" ];then shift ##
-  board_name=$1; shift
+elif [ "$1" = "board" ];then shift ##
+  board_pattern=$1; shift
+  board_id="$($0 board_match_to_id ${board_pattern})"
   output="$(
-  ${0} boards \
-    | jq \
-      -r \
-      --arg board_name "${board_name}" \
-      "map(select(.name|gsub(\" \";\"_\")|test(\$board_name;\"i\"))|.shortLink)[]"
-        )"
-  
-elif [ "$1" = "board_list_map" ];then shift ##
-  board_id=$1; shift
-  output="$($0 board ${board_id} | jq -c 'first|.lists|map({id,name})')"
+    $0 boards \
+      | jq -c \
+      --arg board_id "${board_id}" \
+      'map(select(.id==$board_id))'
+    )"
+ 
+elif [ "$1" = "board_match_to_id" ];then shift ##
+  board_pattern=$1; shift
+  matched_id="$(
+    $0 boards \
+      | jq -r \
+        --arg board_pattern "${board_pattern}" \
+        'map(select(.id==$board_pattern)|.id)[]'
+    )"
+  if [[ -z "${matched_id}" ]];then
+    matched_id="$(
+      $0 boards \
+        | jq -r \
+          --arg board_pattern "${board_pattern}" \
+          'map(select(.shortLink==$board_pattern)|.id)[]'
+      )"
+  fi
+  if [[ -z "${matched_id}" ]];then
+    matched_id="$(
+      $0 boards \
+        | jq -r \
+          --arg board_pattern "${board_pattern}" \
+          'map(select(.name|gsub(" ";"_")|test($board_pattern;"i"))|.id)[]'
+      )"
+  fi
+  if [[ -z "${matched_id}" ]] || [[ "${matched_id}" =~ $'\n' ]];then
+    echo "no or multiple board id matches: ${matched_id}" >&2
+    exit 1
+  fi
+  output="${matched_id}"
 
-elif [ "$1" = "list_name_map" ];then shift ##
+elif [ "$1" = "board_list_map" ];then shift ## used by trellowarrior
+  board_pattern=$1; shift
+  output="$( 
+    $0 board ${board_pattern} \
+      | jq -c 'first|.lists|map({id,name})'
+    )"
+
+elif [ "$1" = "list_name_map" ];then shift ## used by trellowarrior
   output="$($0 boards | jq -c 'map(.id as $board_id|.lists|map({id,name,board_id:$board_id}))|flatten')"
 
-elif [ "$1" = "list_name" ];then shift ##
-  list_id=$1; shift
-  output="$($0 boards | jq -r --arg list_id "${list_id}" 'map(select(.lists|contains([{id:$list_id}]))|.lists|map(select(contains({id:$list_id}))|.name)|first)|first')"
+# elif [ "$1" = "list_name" ];then shift ##
+#   list_id=$1; shift
+#   output="$($0 boards | jq -r --arg list_id "${list_id}" 'map(select(.lists|contains([{id:$list_id}]))|.lists|map(select(contains({id:$list_id}))|.name)|first)|first')"
 
 elif [ "$1" = "board_list_id" ];then shift ##
   board_name=$1; shift
-  list_name=$1; shift
+  list_pattern=$1; shift
 
-  board_id="$(${0}
+  board_id="$($0 board_match_to_id ${board_name})"
+  output="$($0 list_id ${board_id} ${list_pattern})"
 
-elif [ "$1" = "list_id" ];then shift ##
-  board_id=$1; shift
-  list_name=$1; shift
-  if [[ "${#board_id}" -eq 24 ]];then
-    board_key="id"
-  else
-    board_key="shortLink"
-  fi
-  output="$($0 boards | jq -r --arg board_key "${board_key}" --arg board_id "${board_id}" --arg list_name "${list_name}" 'map(select(.[$board_key]==$board_id))|first|.lists//[]|map(select(.name|gsub(" ";"_")|test($list_name;"i"))|.id)[]')"
-
-elif [ "$1" = "board" ];then shift ##
-  board_id=$1; shift
-  if [[ ! -r "${trello_cache_dir}/boards.json" ]];then
-      curl -s "https://trello.com/1/members/${member}/boards?key=${trello_key}&token=${trello_token}\
-&filter=open\
-&lists=open\
-&fields=all\
-&list_fields=all\
-"  > ${trello_cache_dir}/boards.json
-  fi
-  if [[ "${#board_id}" -eq 24 ]];then
-    board_key="id"
-  else
-    board_key="shortLink"
-  fi
-  output="$(jq --arg board_key "${board_key}" --arg board_id "${board_id}" -c 'map(select(.[$board_key] == $board_id))' ${trello_cache_dir}/boards.json)"
+elif [ "$1" = "list_name_to_id" ];then shift ##
+  board_pattern=$1; shift
+  list_pattern=$1; shift
+  output="$(
+    $0 board ${board_pattern} \
+      | jq -r \
+      --arg list_pattern "${list_pattern}" \
+      'first|.lists//[]|map(select(.name|gsub(" ";"_")|test($list_pattern;"i"))|.id)[]'
+    )"
 
 elif [ "$1" = "board_custom_fields" ];then shift ##
   board_id=$1; shift
@@ -461,6 +471,15 @@ elif [ "$1" = "update_cards_from_json" ];then shift ##
 
 elif [ "$1" = "add_card" ];then shift ##
   list_id="$1"; shift
+  if [[ "${list_id}" =~ ^[a-zA-Z0-9_-]*:[a-zA-Z0-9_-]*$ ]];then
+    board_pattern="${list_id%:*}"
+    list_pattern="${list_id#*:}"
+    list_id="$( $0 list_name_to_id ${board_pattern} ${list_pattern})"
+  fi
+  if [[ -z "${list_id}" ]];then
+    echo "no matching list id: ${list_id}"
+    exit 1
+  fi
   card_name="$(echo "$@"|urlencode)"
   shift $#
   if [[ -z "${card_name}" ]];then
