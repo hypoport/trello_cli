@@ -84,6 +84,16 @@ elif [ "$1" = "boards" ];then shift ##
 "  > ${trello_cache_dir}/boards.json
   fi
   output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
+
+elif [ "$1" = "board_name_to_shortlink" ];then shift ##
+  board_name=$1; shift
+  output="$(
+  ${0} boards \
+    | jq \
+      -r \
+      --arg board_name "${board_name}" \
+      "map(select(.name|gsub(\" \";\"_\")|test(\$board_name;\"i\"))|.shortLink)[]"
+        )"
   
 elif [ "$1" = "board_list_map" ];then shift ##
   board_id=$1; shift
@@ -95,6 +105,12 @@ elif [ "$1" = "list_name_map" ];then shift ##
 elif [ "$1" = "list_name" ];then shift ##
   list_id=$1; shift
   output="$($0 boards | jq -r --arg list_id "${list_id}" 'map(select(.lists|contains([{id:$list_id}]))|.lists|map(select(contains({id:$list_id}))|.name)|first)|first')"
+
+elif [ "$1" = "board_list_id" ];then shift ##
+  board_name=$1; shift
+  list_name=$1; shift
+
+  board_id="$(${0}
 
 elif [ "$1" = "list_id" ];then shift ##
   board_id=$1; shift
