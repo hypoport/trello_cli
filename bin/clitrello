@@ -265,7 +265,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
-    $0 tag_set ${idBoard} ${card_id} "${tags}"
+    $0 card_tags ${idBoard} ${card_id} "${tags}"
     )"
   echo "rate_limit tags: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
@@ -273,7 +273,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
-    $0 prio_set ${idBoard} ${card_id} "${priority}"
+    $0 card_prio ${idBoard} ${card_id} "${priority}"
     )"
   echo "rate_limit prio: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
@@ -296,7 +296,7 @@ elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j8 -N1 --pipe "$0 update_card_from_json"
 
 
-elif [ "$1" = "prio_set" ];then shift ##
+elif [ "$1" = "card_prio" ];then shift ##
   board_id="$1"; shift
   card_id="$1"; shift
   prio="$1"; shift
@@ -313,7 +313,7 @@ elif [ "$1" = "prio_set" ];then shift ##
   | tr -d '\r' \
   || true
 
-elif [ "$1" = "tag_set" ];then shift ##
+elif [ "$1" = "card_tags" ];then shift ##
   board_id="$1";shift
   card_id="$1"; shift
   tags="$1"; shift
