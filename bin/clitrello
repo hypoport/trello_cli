@@ -231,7 +231,6 @@ elif [ "$1" = "my_cards" ];then shift ##
 &customFieldItems=true\
 ")"
 
-
 elif [ "$1" = "update_card_from_json" ];then shift ##
   line="$(cat -)"
   card_id="$(jq -r '.id' <<<"$line")"
@@ -240,35 +239,49 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   idBoard="$(jq -r '.idBoard' <<<"$line")"
   tags="$(jq -r '.tags//""' <<<"$line")"
   priority="$(jq -r '.priority//""' <<<"$line")"
+  #desc
+  #idMembers
+  #idLabels
+  #due
 
-  wait_time=15 limit=20 $0 check_rate
-  # echo "update card: ${name}"
-  if [[ -n "${name}" ]];then
-      curl \
-        -o /dev/null -w "%{http_code}\n" \
-        -s -XPUT \
-        --data-urlencode "idList=${idList}" \
-        --data-urlencode "name=${name}" \
-        "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-    #desc
-    #idMembers
-    #idLabels
-    #due
-
-  fi
-  # if [[ -n "${tags}" ]];then
-    # echo "update tags for: ${name} with tags: ${tags}" >&2
-    $0 tag_set ${idBoard} ${card_id} "${tags}"
-  # fi
-  # if [[ -n "${priority}" ]];then
-    # echo "update tags for: ${name} with prio: ${priority}" >&2
-    $0 prio_set ${idBoard} ${card_id} "${priority}"
-  # fi
-  wait_time=5 limit=50 $0 check_rate
-
-elif [ "$1" = "check_rate" ];then shift
   : ${limit:="60"}
   : ${wait_time:="10"}
+  rate_limit_remaining="$( 
+    curl \
+      -i -s \
+      -XPUT \
+      --data-urlencode "idList=${idList}" \
+      --data-urlencode "name=${name}" \
+      "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
+    | grep -i "x-rate-limit-api-token-remaining" \
+    | awk -F':' '{print $2}' \
+    | tr -d ' ' \
+    | tr -d '\r' \
+    || true \
+  )"
+  echo "rate_limit update card: ${rate_limit_remaining}"
+  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+    echo "rate limit is below ${limit} wait ${wait_time}"
+    sleep ${wait_time} 
+  fi
+  rate_limit_remaining="$( 
+    $0 tag_set ${idBoard} ${card_id} "${tags}"
+    )"
+  echo "rate_limit tags: ${rate_limit_remaining}"
+  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+    echo "rate limit is below ${limit} wait ${wait_time}"
+    sleep ${wait_time} 
+  fi
+  rate_limit_remaining="$( 
+    $0 prio_set ${idBoard} ${card_id} "${priority}"
+    )"
+  echo "rate_limit prio: ${rate_limit_remaining}"
+  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+    echo "rate limit is below ${limit} wait ${wait_time}"
+    sleep ${wait_time} 
+  fi
+
+elif [ "$1" = "check_rate" ];then shift
   rate_limit_remaining="$( 
     curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}" \
       | grep -i "x-rate-limit-api-token-remaining" \
@@ -277,11 +290,7 @@ elif [ "$1" = "check_rate" ];then shift
       | tr -d '\r' \
       || true
   )"
-  echo "rate_limit: ${rate_limit_remaining}"
-  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
-    echo "rate limit is below ${limit} wait ${wait_time}"
-    sleep ${wait_time} 
-  fi
+  echo "${rate_limit_remaining}"
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
   parallel -j8 -N1 --pipe "$0 update_card_from_json"
@@ -294,11 +303,15 @@ elif [ "$1" = "prio_set" ];then shift ##
   custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
   idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
   jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
-  | curl -s -XPUT \
-    -o /dev/null -w "%{http_code}\n" \
+  | curl -i -s -XPUT \
     -H "Content-Type: application/json" \
     --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}" \
+  | grep -i "x-rate-limit-api-token-remaining" \
+  | awk -F':' '{print $2}' \
+  | tr -d ' ' \
+  | tr -d '\r' \
+  || true
 
 elif [ "$1" = "tag_set" ];then shift ##
   board_id="$1";shift
@@ -306,11 +319,15 @@ elif [ "$1" = "tag_set" ];then shift ##
   tags="$1"; shift
   custom_field_id="$($0 board_custom_field_id_by_name ${board_id} tags)"
   jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
-  | curl -s -XPUT \
-    -o /dev/null -w "%{http_code}\n" \
+  | curl -i -s -XPUT \
     -H "Content-Type: application/json" \
     --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}" \
+  | grep -i "x-rate-limit-api-token-remaining" \
+  | awk -F':' '{print $2}' \
+  | tr -d ' ' \
+  | tr -d '\r' \
+  || true
 
 
 elif [ "$1" = "card_comment" ];then shift ##
