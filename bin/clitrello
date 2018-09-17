@@ -13,46 +13,20 @@ fi
 
 # https://developers.trello.com/v1.0/reference#cards-nested-resource
 # https://developers.trello.com/docs/getting-started-custom-fields
-
 # &card_limit=100
 
-while getopts "m:f:lecph?" options; do case $options in
-  m) member="$OPTARG" ;;
-  f) filter="$OPTARG" ;;
-  l) show_last_activity=1 ;;
-  c) show_closed=1 ;;
-  e) show_empty_list=1 ;;
-  p) show_pinned=1 ;;
+while getopts "h?" options; do case $options in
   h|?) help; exit ;;
 esac; done; shift $((OPTIND - 1))
 
 [[ -r ~/.$(basename ${0})rc ]] && { source ~/.$(basename ${0})rc; }
 
-: ${member_array_field:="initials"}
 : ${member:="me"}
 : ${output:=""}
-: ${custom_markdown_fields:=""}
-
 : ${filter:="visible"} # all, closed, none, open, visible
-: ${show_pinned:=0} # yes no
-: ${show_empty_list:=0} # yes no
 
-: ${show_last_activity:=0} # yes no
-: ${show_closed:=0} # yes no
-: ${show_comments:=""} # yes no
-
-if [[ "${show_last_activity}" -eq 1 ]];then
-  custom_markdown_fields+=" + (.dateLastActivity|sub(\"T.*$\";\" \"))"
-fi
-if [[ "${show_closed}" -eq 1 ]];then
-  custom_markdown_fields+=" + (.closed|tostring) + \" \""
-fi
-
-export custom_markdown_fields
 export member
 export filter
-export show_empty_list
-export show_pinned
 
 if [[ "$#" -eq 0 ]];then
   :
@@ -76,7 +50,6 @@ elif [ "$1" = "boards" ];then shift ##
 "  > ${trello_cache_dir}/boards.json
   fi
   output="$(jq -c '.' ${trello_cache_dir}/boards.json)"
-  # output="$(jq -c 'map({id,name,shortLink,lists:(.lists|map({id,name}))})' ${trello_cache_dir}/boards.json)"
 
 elif [ "$1" = "board" ];then shift ##
   board_pattern=$1; shift
@@ -118,6 +91,28 @@ elif [ "$1" = "board_match_to_id" ];then shift ##
   fi
   output="${matched_id}"
 
+elif [ "$1" = "board_lists" ];then shift
+  output="$(
+    $0 boards \
+      | jq -r 'map("\(.shortLink) \(.name) (l:\(.lists|length))")[]'
+    )"
+
+elif [ "$1" = "list_lists" ];then shift
+  board_pattern="$1";shift
+  output="$(
+    $0 board ${board_pattern}\
+      | jq -r "map(\
+.formatted=[]| \
+.formatted+=[ .shortLink + \" \" + .name ] | \
+.formatted+=[ \
+  (.lists[]|[\"  \"+.id+\" \"+.name ]|.[]) \
+] \
+| .formatted+=[ \"\\n\" ] \
+)|\
+map(.formatted)|flatten|.[]\
+" 
+      )"
+
 elif [ "$1" = "board_list_map" ];then shift ## used by trellowarrior
   board_pattern=$1; shift
   output="$( 
@@ -128,20 +123,15 @@ elif [ "$1" = "board_list_map" ];then shift ## used by trellowarrior
 elif [ "$1" = "list_name_map" ];then shift ## used by trellowarrior
   output="$($0 boards | jq -c 'map(.id as $board_id|.lists|map({id,name,board_id:$board_id}))|flatten')"
 
-# elif [ "$1" = "list_name" ];then shift ##
-#   list_id=$1; shift
-#   output="$($0 boards | jq -r --arg list_id "${list_id}" 'map(select(.lists|contains([{id:$list_id}]))|.lists|map(select(contains({id:$list_id}))|.name)|first)|first')"
-
-elif [ "$1" = "board_list_id" ];then shift ##
-  board_name=$1; shift
-  list_pattern=$1; shift
-
-  board_id="$($0 board_match_to_id ${board_name})"
-  output="$($0 list_id ${board_id} ${list_pattern})"
-
 elif [ "$1" = "list_name_to_id" ];then shift ##
-  board_pattern=$1; shift
-  list_pattern=$1; shift
+  if [[ "$#" -eq 1 ]] && [[ "${1}" =~ ^[a-zA-Z0-9_-]*:[a-zA-Z0-9_-]*$ ]];then
+    board_pattern="${1%:*}"
+    list_pattern="${1#*:}"
+    shift
+  elif [[ "$#" -eq 2 ]];then
+    board_pattern=$1;shift
+    list_pattern=$1;shift
+  fi
   output="$(
     $0 board ${board_pattern} \
       | jq -r \
@@ -150,7 +140,8 @@ elif [ "$1" = "list_name_to_id" ];then shift ##
     )"
 
 elif [ "$1" = "board_custom_fields" ];then shift ##
-  board_id=$1; shift
+  board_pattern=$1; shift
+  board_id="$($0 board_match_to_id ${board_pattern})"
   if [[ ! -r "${trello_cache_dir}/board_${board_id}_custom_fields.json" ]];then
     curl -s "https://trello.com/1/boards/${board_id}/customFields?key=${trello_key}&token=${trello_token}"  \
       > ${trello_cache_dir}/board_${board_id}_custom_fields.json
@@ -158,41 +149,40 @@ elif [ "$1" = "board_custom_fields" ];then shift ##
   output="$( jq '.' ${trello_cache_dir}/board_${board_id}_custom_fields.json)"
 
 elif [ "$1" = "board_custom_field_id_by_name" ];then shift ##
-  board_id=$1; shift
+  board_pattern=$1; shift
   field_name=$1; shift
   output="$(
-  $0 board_custom_fields ${board_id} \
+    $0 board_custom_fields ${board_pattern} \
     | jq \
       --arg field_name "${field_name}" \
       -r \
       'map(select(.name==$field_name))|first|.id//null'
-        )"
+    )"
 
 elif [ "$1" = "board_custom_field_prio_id_value" ];then shift ##
-  board_id=$1; shift
+  board_pattern=$1; shift
   prio=$1; shift
   output="$(
-  $0 board_custom_fields ${board_id} \
+    $0 board_custom_fields ${board_pattern} \
     | jq \
       --arg field_name "prio" \
       --arg value "${prio}" \
       -r \
       'map(select(.name==$field_name))|first|.options//[]|map(select(.value.text==$value))|first|.id//""'
-        )"
+    )"
 
-# elif [ "$1" = "board_custom_field_id_by_name_prio" ];then shift ##
-#   board_id=$1; shift
-#   field_name=$1; shift
-#   value=$1; shift
-#   output="$(
-#   $0 board_custom_fields ${board_id} \
-#     | jq \
-#       --arg field_name "${field_name}" \
-#       --arg value "${value}" \
-#       -r \
-#       'map(select(.name==$field_name))|first|.options|map(select(.value.text==$value))'
-#         )"
-#
+elif [ "$1" = "board_prio_id_map" ];then shift ##
+  board_pattern=$1;shift
+  prio_H_idValue="$(clitrello board_custom_field_prio_id_value ${board_pattern} H)"
+  prio_M_idValue="$(clitrello board_custom_field_prio_id_value ${board_pattern} M)"
+  prio_L_idValue="$(clitrello board_custom_field_prio_id_value ${board_pattern} L)"
+  output="$(
+    jq -c -n \
+      --arg prio_H_idValue "${prio_H_idValue}" \
+      --arg prio_M_idValue "${prio_M_idValue}" \
+      --arg prio_L_idValue "${prio_L_idValue}" \
+      '{($prio_H_idValue):"H",($prio_M_idValue):"M",($prio_L_idValue):"L"}|del(."")'
+    )"
 
 elif [ "$1" = "cache_clear" ];then shift ##
   find ${trello_cache_dir} -type f -name "*.json" -delete
@@ -200,11 +190,12 @@ elif [ "$1" = "cache_clear" ];then shift ##
 elif [ "$1" = "cache_show" ];then shift ##
   ls -1 ${trello_cache_dir}
 
-# elif [ "$1" = "cache_update" ];then shift ##
-#   ${0} boards 
+elif [ "$1" = "cache_update" ];then shift ##
+  ${0} boards | jq 'length'
 
 elif [ "$1" = "cards" ];then shift ##
-  board_id=$1; shift
+  board_pattern=$1; shift
+  board_id="$($0 board_match_to_id ${board_pattern})"
   output="$(curl -s "https://trello.com/1/boards/${board_id}/cards?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &fields=all\
@@ -227,7 +218,6 @@ elif [ "$1" = "card" ];then shift ##
 &customFieldItems=true\
 ")"
 
-
 elif [ "$1" = "my_cards" ];then shift ##
   # : ${card_fields:="due,name,shortLink,shortUrl,idBoard,idList,closed,dateLastActivity"}
   : ${card_fields:="all"}
@@ -242,198 +232,24 @@ elif [ "$1" = "my_cards" ];then shift ##
 ")"
 
 
-
-elif [ "$1" = "tag_neg_filter" ];then shift ##
-  tag_name="$1"; shift
-  output="$(jq --arg tag "${tag_name}" "map( select( .customFieldItems//[] | .[].value.text|contains(\$tag) |not))" )"
-  
-elif [ "$1" = "tag_filter" ];then shift ##
-  tag_name="$1"; shift
-  output="$(jq --arg tag "${tag_name}" "map(select( .customFieldItems//[] | .[].value.text|contains(\$tag)))" )"
-
-elif [ "$1" = "filter_due_date" ];then shift ##
-  : ${max_due_date:="$(date +%F)T23:59:59"}
-  output="$(
-    jq --arg max_due_date "${max_due_date}" 'map(select(.due<=$max_due_date and .due != null))'
-  )"
-
-elif [ "$1" = "urgent" ];then shift ##
-  max_due_date="$(gdate -d "+ 3 day" +%F)" $0 cards filter_due_date cards_markdown 
-
-
-
-elif [ "$1" = "markdown" ];then shift ##
-  input="$(cat -)"
-  commmand=""
-  echo "$input" | jq -e 'map(has("lists"))|.[0]==true' >/dev/null && command="boards_markdown" || command="cards_markdown" 
-  echo "$input" | $0 $command
-
-elif [ "$1" = "text" ];then shift ##
-  input="$(cat -)"
-  commmand=""
-  echo "$input" | jq -e 'map(has("lists"))|.[0]==true' >/dev/null && command="boards_text" || command="cards_text" 
-  echo "$input" | $0 $command
-
-elif [ "$1" = "boards_markdown" ];then shift
-  output="$(jq -r 'map("# <\(.shortLink)> `\(.name)`")[]')"
-
-elif [ "$1" = "boards_text" ];then shift
-  output="$(jq -r "map(\
-.formatted=[]| \
-.formatted+=[ .shortLink + \" \" + .name ] | \
-.formatted+=[ \
-  (.lists[]|[\"  \"+.id+\" \"+.name ]|.[]) \
-] \
-| .formatted+=[ \"\\n\" ] \
-)|\
-map(.formatted)|flatten|.[]\
-" )"
-
-elif [ "$1" = "cards_markdown" ];then shift
-  commands=""
-  commands+=" _cards_group_by_board"
-  if [[ "${show_empty_list}" -ne 1 ]];then
-    commands+=" _cards_grouped_clear_empty_lists"
-  fi
-  commands+=" _cards_grouped_to_markdown"
-  $0 $commands
-
-elif [ "$1" = "cards_text" ];then shift
-  commands=""
-  commands+=" _cards_group_by_board"
-  if [[ "${show_empty_list}" -ne 1 ]];then
-    commands+=" _cards_grouped_clear_empty_lists"
-  fi
-  commands+=" _cards_grouped_to_text"
-  $0 $commands
-
-elif [ "$1" = "_cards_grouped_clear_empty_lists" ];then shift
-  output="$(jq 'map(.lists=(.lists|map(if ((.cards|length)==0) then del(.)|empty else . end)))')"
-
-
-elif [ "$1" = "_cards_group_by_board" ];then shift
-  # : ${boards="[]"}
-  boards="$($0 boards)"
-  #TODO sort cards by field
-  output="$(jq -c --argjson boards "${boards}" \
-"\
-. as \$cards |\
-.|group_by(.idBoard)|map(\
-  .[0].idBoard as \$boardId | \
-  {\
-    id:\$boardId,\
-    name:(\$boards|map(select(.id==\$boardId))|first|.name),\
-    shortLink:(\$boards|map(select(.id==\$boardId))|first|.shortLink//\$boardId)\
-    ,\
-    lists:(\
-      if ((\$boards|length)!=0) then \
-        (\$boards|map(select(.id==\$boardId))|first|.lists//[])\
-        |map(\
-          .id as \$idList |\
-          .cards=(\$cards|map(select(.idList==\$idList)))\
-        )\
-      else \
-        ( \$cards|map(select(.idBoard==\$boardId))|group_by(.idList)  | \
-          map(\
-            .[0].idList as \$listId |\
-            {\
-              id:\$listId,\
-              name:\"\",\
-              cards:(.)\
-            }\
-          )\
-        ) \
-      end \
-    )\
-  }\
-)\
-" )"
-
-elif [ "$1" = "_cards_grouped_to_markdown" ];then shift
-  output="$(jq -r --arg show_comments "$show_comments" "map(\
-.formatted=[]| \
-.formatted+=[ \"# <\" + .shortLink + \">    \" + \"\`\" + .name + \"\`\" ] | \
-.formatted+=[ \
-  (.lists[]| \
-    [ \"## <\" + .id + \"> \" + \"\`\" + .name + \"\`\", \
-      ( .cards[] | \
-        \"* <\" + .shortLink + \">      \" \
-        ${custom_markdown_fields} \
-        + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.${member_array_field}?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
-        + (.due//\"\"|sub(\"T.*$\";\" \")) \
-        + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
-        + (if (.labels|length)>0 then \"(\" + (.labels|map(if .name == \"\" then .color else .name end)|join(\",\"))+ \") \" else \"\" end) \
-        + (if (.customFieldItems|length)>0 then \"[\" + (.customFieldItems|map(.value.text//\" \")|join(\" \"))+ \"] \" else \"\" end) \
-        + \"\`\"  + .name + \"\`\" \
-        + (if ((.actions|length)>0 and (\$show_comments!=\"\")) then \"\\n\" + (.actions|map(select(.type==\"commentCard\")|\"                    \(.date|sub(\"T.*\$\";\"\")) \(.data.text)\")|join(\"\\n\")) else \"\" end) \
-      ) \
-    ]|.[] \
-  ) \
-] \
-| .formatted+=[ \"\\n\" ] \
-)|\
-map(.formatted)|flatten|.[]\
-" )"
-
-elif [ "$1" = "_cards_grouped_to_text" ];then shift
-  output="$(jq -r --arg show_comments "$show_comments" "map(\
-.formatted=[]| \
-.formatted+=[ .shortLink + \" \" + .name ] | \
-.formatted+=[ \
-  (.lists[]| \
-    [ \"  \" + .id + \" \" + .name, \
-      ( .cards[] | \
-        \"    \" + .shortLink + \"  \" \
-        ${custom_markdown_fields} \
-        + (if (.members//[]|length)>0 then (\"[\" + (.members//[]|map(.${member_array_field}?)|flatten|join(\",\")) + \"] \") else \"\" end ) \
-        + (.due//\"\"|sub(\"T.*$\";\" \")) \
-        + (if (.badges.checkItems>0) then ((.badges.checkItemsChecked|tostring) +\"/\" +(.badges.checkItems|tostring) +\" \") else \"\" end ) \
-        + (if (.labels|length)>0 then \"(\" + (.labels|map(if .name == \"\" then .color else .name end)|join(\",\"))+ \") \" else \"\" end) \
-        + (if (.customFieldItems|length)>0 then \"[\" + (.customFieldItems|map(.value.text//\" \")|join(\" \"))+ \"] \" else \"\" end) \
-        + .name \
-        + (if ((.actions|length)>0 and (\$show_comments!=\"\")) then \"\\n\" + (.actions|map(select(.type==\"commentCard\")|\"                    \(.date|sub(\"T.*\$\";\"\")) \(.data.text)\")|join(\"\\n\")) else \"\" end) \
-      ) \
-    ]|.[] \
-  ) \
-] \
-| .formatted+=[ \"\\n\" ] \
-)|\
-map(.formatted)|flatten|.[]\
-" )"
-
-elif [ "$1" = "comment" ];then shift ##
-  card_id="$1"; shift
-  if [[ -n "$@" ]]; then
-    comment="$@"
-    shift $#
-  else
-    read -p 'enter comment: ' comment
-  fi
-  output=$(curl \
-    -s \
-    -X POST \
-    -d "text=$comment" \
-    "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}" \
-    | jq -r '.id'
-  )
-
 elif [ "$1" = "update_card_from_json" ];then shift ##
   line="$(cat -)"
-  card_id="$(jq -r ".id" <<<"$line")"
+  card_id="$(jq -r '.id' <<<"$line")"
   name="$(jq -r '.name|gsub("^ ";"")|gsub(" $";"")' <<<"$line")"
-  idList="$(jq -r ".idList" <<<"$line")"
-  tags="$(jq -r ".tags//\"\"" <<<"$line")"
-  priority="$(jq -r ".priority//\"\"" <<<"$line")"
+  idList="$(jq -r '.idList' <<<"$line")"
+  idBoard="$(jq -r '.idBoard' <<<"$line")"
+  tags="$(jq -r '.tags//""' <<<"$line")"
+  priority="$(jq -r '.priority//""' <<<"$line")"
 
   wait_time=15 limit=20 $0 check_rate
   # echo "update card: ${name}"
   if [[ -n "${name}" ]];then
-    curl \
-      -o /dev/null -w "%{http_code}\n" \
-      -s -XPUT \
-      --data-urlencode "idList=${idList}" \
-      --data-urlencode "name=${name}" \
-      "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+      curl \
+        -o /dev/null -w "%{http_code}\n" \
+        -s -XPUT \
+        --data-urlencode "idList=${idList}" \
+        --data-urlencode "name=${name}" \
+        "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
     #desc
     #idMembers
     #idLabels
@@ -442,184 +258,13 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   fi
   # if [[ -n "${tags}" ]];then
     # echo "update tags for: ${name} with tags: ${tags}" >&2
-    $0 tag_set ${card_id} "${tags}"
+    $0 tag_set ${idBoard} ${card_id} "${tags}"
   # fi
   # if [[ -n "${priority}" ]];then
     # echo "update tags for: ${name} with prio: ${priority}" >&2
-    $0 prio_set ${card_id} "${priority}"
+    $0 prio_set ${idBoard} ${card_id} "${priority}"
   # fi
   wait_time=5 limit=50 $0 check_rate
-
-elif [ "$1" = "update_cards_from_json" ];then shift ##
-  parallel -j8 -N1 --pipe "$0 update_card_from_json"
-
-# elif [ "$1" = "test_line" ];then shift ##
-#   in="$(cat -)"
-#   sleep 1
-#   echo ">>${in}"
-#
-# elif [ "$1" = "test_lines" ];then shift ##
-#   parallel -j3 -N1 --pipe "$0 test_line"
-#
-# elif [ "$1" = "create_json_card" ];then shift ##
-#   curl \
-#     -s -XPOST \
-#     --data-urlencode "idList=5b996ad07b5d687ee534d426" \
-#     --data-urlencode "name=blbbbb" \
-#     "https://trello.com/1/cards?key=${trello_key}&token=${trello_token}\
-# "
-
-elif [ "$1" = "add_card" ];then shift ##
-  list_id="$1"; shift
-  if [[ "${list_id}" =~ ^[a-zA-Z0-9_-]*:[a-zA-Z0-9_-]*$ ]];then
-    board_pattern="${list_id%:*}"
-    list_pattern="${list_id#*:}"
-    list_id="$( $0 list_name_to_id ${board_pattern} ${list_pattern})"
-  fi
-  if [[ -z "${list_id}" ]];then
-    echo "no matching list id: ${list_id}"
-    exit 1
-  fi
-  card_name="$(echo "$@"|urlencode)"
-  shift $#
-  if [[ -z "${card_name}" ]];then
-    read -e -p "enter new card name: " card_name
-    card_name="$(echo "$card_name"|urlencode)"
-  fi
-  curl -s -XPOST "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
-&name=${card_name}\
-"
-
-elif [ "$1" = "_del_card" ];then shift
-  card_id="$1"; shift
-  curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "archive_card" ];then shift ##
-  card_id="$1"; shift
-  curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
-&value=true\
-"
-
-
-elif [ "$1" = "tag_del" ];then shift ##
-  card_id="$1"; shift
-  tag="$1"; shift
-  custom_field_data="$($0 card $card_id | jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' )"
-  if [[ "${custom_field_data}" != "null" ]];then
-    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
-    custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
-    new_custom_field_value="$(echo "$custom_field_value_text" | sed -e "s/${tag}//g" -e "s/,,/,/g" -e "s/^,$//g" -e "s/,$//g" )"
-
-    jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
-    | curl -s -XPUT \
-      -H "Content-Type: application/json" \
-      --data-binary @- \
-      "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
-  fi
-
-elif [ "$1" = "tag_add" ];then shift ##
-  card_id="$1"; shift
-  tag="$1"; shift
-  card_data="$($0 card $card_id)"
-  custom_field_data="$(jq '.customFieldItems|map(select(has("value") and (.value|has("text") )))|first' <<<"${card_data}")"
-
-  if [[ "${custom_field_data}" == "null" ]];then
-    id_board="$(jq -r '.idBoard' <<<"${card_data}")"
-    custom_field_id="$(curl -s "https://trello.com/1/boards/${id_board}/customFields?key=${trello_key}&token=${trello_token}" \
-      | jq -r 'map(select(.name=="tags"))|first|.id//null')"
-    new_custom_field_value="${tag}"
-  else
-    custom_field_id="$(jq -r '.idCustomField' <<<"${custom_field_data}")"
-    custom_field_value_text="$(jq -r '.value.text' <<<"${custom_field_data}")"
-    new_custom_field_value="${custom_field_value_text:+"${custom_field_value_text},"}${tag}"
-  fi
-
-  jq -n --arg value "${new_custom_field_value}" '{value:{text:$value}}' \
-  | curl -s -XPUT \
-    -H "Content-Type: application/json" \
-    --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "prio_set" ];then shift ##
-  card_id="$1"; shift
-  prio="$1"; shift
-  if [[ -z "${board_id:-""}" ]];then
-    card_data="$($0 card $card_id)"
-    board_id="$(jq -r '.idBoard' <<<"${card_data}")"
-  fi
-  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
-  idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
-  jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
-  | curl -s -XPUT \
-    -o /dev/null -w "%{http_code}\n" \
-    -H "Content-Type: application/json" \
-    --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "tag_set" ];then shift ##
-  card_id="$1"; shift
-  tags="$1"; shift
-  if [[ -z "${custom_field_id:-""}" ]];then
-    if [[ -z "${board_id:-""}" ]];then
-      card_data="$($0 card $card_id)"
-      board_id="$(jq -r '.idBoard' <<<"${card_data}")"
-    fi
-    custom_field_id="$($0 board_custom_field_id_by_name ${board_id} tags)"
-  fi
-  jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
-  | curl -s -XPUT \
-    -o /dev/null -w "%{http_code}\n" \
-    -H "Content-Type: application/json" \
-    --data-binary @- \
-    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "_card_name" ];then shift
-  card_id="$1"; shift
-  output="$(curl -s "https://trello.com/1/cards/${card_id}/name?key=${trello_key}&token=${trello_token}")"
-
-elif [ "$1" = "setname" ];then shift ##
-  card_id="$1"; shift
-  : ${card_name:="$@"}
-  shift $#
-  if [[ -z "${card_name}" ]];then
-    read -e -p "enter new card name: " card_name
-  fi
-  card_name="$(echo "${card_name}" | urlencode)"
-  curl -s -XPUT \
-    -d "name=${card_name}" \
-    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "rename" ];then shift ##
-  card_id="$1"; shift
-  : ${card_name:="$@"}
-  shift $#
-  if [[ -z "${card_name}" ]];then
-    : ${old_name:="$($0 _card_name ${card_id} | jq -r ._value )"}
-    read -i "${old_name}" -e -p "enter new card name: " card_name
-  fi
-  card_name="$(echo "${card_name}" | urlencode)"
-  curl -s -XPUT \
-    -d "name=${card_name}" \
-    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
-
-elif [ "$1" = "card_desc_edit" ];then shift ##
-  card_id="$1"; shift
-  $0 card ${card_id} | jq -r '.desc' | vipe | $0 card_desc ${card_id}
-
-elif [ "$1" = "card_desc" ];then shift ##
-  card_id="$1"; shift
-  if [[ -p /dev/stdin ]]; then
-    : ${description:="$(cat)"}
-  else
-    : ${description:="$@"}
-    shift $#
-  fi
-  description="$(echo "${description}" | urlencode)"
-  output="$(curl -s -XPUT \
-    -d "desc=${description}" \
-    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
-    | jq -r '.id'
-  )"
 
 elif [ "$1" = "check_rate" ];then shift
   : ${limit:="60"}
@@ -638,33 +283,114 @@ elif [ "$1" = "check_rate" ];then shift
     sleep ${wait_time} 
   fi
 
-elif [ "$1" = "member" ];then shift
+elif [ "$1" = "update_cards_from_json" ];then shift ##
+  parallel -j8 -N1 --pipe "$0 update_card_from_json"
+
+
+elif [ "$1" = "prio_set" ];then shift ##
+  board_id="$1"; shift
+  card_id="$1"; shift
+  prio="$1"; shift
+  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
+  idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
+  jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
+  | curl -s -XPUT \
+    -o /dev/null -w "%{http_code}\n" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "tag_set" ];then shift ##
+  board_id="$1";shift
+  card_id="$1"; shift
+  tags="$1"; shift
+  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} tags)"
+  jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
+  | curl -s -XPUT \
+    -o /dev/null -w "%{http_code}\n" \
+    -H "Content-Type: application/json" \
+    --data-binary @- \
+    "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}"
+
+
+elif [ "$1" = "card_comment" ];then shift ##
+  card_id="$1"; shift
+  if [[ -n "$@" ]]; then
+    comment="$@"
+    shift $#
+  else
+    read -p 'enter comment: ' comment
+  fi
+  output="$(
+    curl -s \
+      -X POST \
+      --data-url "text=$comment" \
+      "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
+    )"
+
+elif [ "$1" = "card_add" ];then shift ##
+  list_pattern="$1"; shift
+  list_id="$($0 list_name_to_id ${list_pattern})"
+  if [[ -z "${list_id}" ]];then
+    echo "no matching list id: ${list_id}"
+    exit 1
+  fi
+  card_name="$(echo "$@"|urlencode)"
+  shift $#
+  if [[ -z "${card_name}" ]];then
+    read -e -p "enter new card name: " card_name
+    card_name="$(echo "$card_name"|urlencode)"
+  fi
+  curl -s -XPOST "https://trello.com/1/lists/${list_id}/cards?key=${trello_key}&token=${trello_token}\
+&name=${card_name}\
+"
+
+elif [ "$1" = "card_delete" ];then shift
+  card_id="$1"; shift
+  curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "card_archive" ];then shift ##
+  card_id="$1"; shift
+  curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
+&value=true\
+"
+
+elif [ "$1" = "card_name" ];then shift ##
+  card_id="$1"; shift
+  : ${card_name:="$@"}
+  shift $#
+  if [[ -z "${card_name}" ]];then
+    read -e -p "enter new card name: " card_name
+  fi
+  card_name="$(echo "${card_name}" | urlencode)"
+  curl -s -XPUT \
+    -d "name=${card_name}" \
+    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
+
+elif [ "$1" = "card_desc_vipe" ];then shift ##
+  card_id="$1"; shift
+  $0 card ${card_id} | jq -r '.desc' | vipe | $0 card_desc ${card_id}
+
+elif [ "$1" = "card_desc" ];then shift ##
+  card_id="$1"; shift
+  if [[ -p /dev/stdin ]]; then
+    : ${description:="$(cat)"}
+  else
+    : ${description:="$@"}
+    shift $#
+  fi
+  description="$(echo "${description}" | urlencode)"
+  output="$(curl -s -XPUT \
+    -d "desc=${description}" \
+    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
+    | jq -r '.id'
+  )"
+
+elif [ "$1" = "test" ];then shift
   curl -o /dev/null -w "%{http_code}\n" -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
   # curl -o /dev/null -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}"
-
-
-
   # curl -o /dev/null -w "%{http_code}" -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
   exit
-
-elif [ "$1" = "_organizations_by_member" ];then shift
-  output="$(curl -s "https://trello.com/1/members/${member}/organizations?key=${trello_key}&token=${trello_token}\
-&fields=name,displayName\
-")"
-
-elif [ "$1" = "_organization_members" ];then shift
-  organization_id=$1; shift
-  output="$(curl -s "https://trello.com/1/organizations/${organization_id}/members?key=${trello_key}&token=${trello_token}\
-&fields=initials,username,fullName,status\
-")"
-
-elif [ "$1" = "known_members" ];then shift ##
-  output="$(for organization_id in $( $0 _organizations_by_member | jq -r 'map(.id)[]'); do
-    $0 _organization_members ${organization_id} | jq -c '.[]'
-  done \
-    | sort -u \
-    | jq -s -c . \
-  )"
 
 else
   echo "unknown command: $@" >&2
