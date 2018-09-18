@@ -243,10 +243,14 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   line="$(cat -)"
   card_id="$(jq -r '.id' <<<"$line")"
   name="$(jq -r '.name|gsub("^ ";"")|gsub(" $";"")' <<<"$line")"
-  idList="$(jq -r '.idList' <<<"$line")"
-  idBoard="$(jq -r '.idBoard' <<<"$line")"
+  board="$(jq -r '.board' <<<"$line")"
+  list="$(jq -r '.list' <<<"$line")"
   tags="$(jq -r '.tags//""' <<<"$line")"
   priority="$(jq -r '.priority//""' <<<"$line")"
+
+  idList="$($0 list_name_to_id "${board}:${list}")"
+  idBoard="$($0 board_match_to_id ${board})"
+
   #desc
   #idMembers
   #idLabels
@@ -258,6 +262,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     curl \
       -i -s \
       -XPUT \
+      --data-urlencode "idBoard=${idBoard}" \
       --data-urlencode "idList=${idList}" \
       --data-urlencode "name=${name}" \
       "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
@@ -273,7 +278,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
-    $0 card_tags ${idBoard} ${card_id} "${tags}"
+    $0 card_tags ${board} ${card_id} "${tags}"
     )"
   echo "rate_limit tags: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
@@ -281,7 +286,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
-    $0 card_prio ${idBoard} ${card_id} "${priority}"
+    $0 card_prio ${board} ${card_id} "${priority}"
     )"
   echo "rate_limit prio: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
@@ -305,11 +310,11 @@ elif [ "$1" = "update_cards_from_json" ];then shift ##
 
 
 elif [ "$1" = "card_prio" ];then shift ##
-  board_id="$1"; shift
+  board_pattern="$1"; shift
   card_id="$1"; shift
   prio="$1"; shift
-  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} prio)"
-  idValue="$($0 board_custom_field_prio_id_value ${board_id} "${prio}")"
+  custom_field_id="$($0 board_custom_field_id_by_name ${board_pattern} prio)"
+  idValue="$($0 board_custom_field_prio_id_value ${board_pattern} "${prio}")"
   jq -n --arg idValue "${idValue}" '{idValue:$idValue}' \
   | curl -i -s -XPUT \
     -H "Content-Type: application/json" \
@@ -322,10 +327,10 @@ elif [ "$1" = "card_prio" ];then shift ##
   || true
 
 elif [ "$1" = "card_tags" ];then shift ##
-  board_id="$1";shift
+  board_pattern="$1";shift
   card_id="$1"; shift
   tags="$1"; shift
-  custom_field_id="$($0 board_custom_field_id_by_name ${board_id} tags)"
+  custom_field_id="$($0 board_custom_field_id_by_name ${board_pattern} tags)"
   jq -n --arg tags "${tags}" '{value:{text:$tags}}' \
   | curl -i -s -XPUT \
     -H "Content-Type: application/json" \
