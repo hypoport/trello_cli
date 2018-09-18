@@ -58,7 +58,7 @@ elif [ "$1" = "board" ];then shift ##
     $0 boards \
       | jq -c \
       --arg board_id "${board_id}" \
-      'map(select(.id==$board_id))'
+      'map(select(.id==$board_id))|first'
     )"
  
 elif [ "$1" = "board_match_to_id" ];then shift ##
@@ -91,6 +91,13 @@ elif [ "$1" = "board_match_to_id" ];then shift ##
   fi
   output="${matched_id}"
 
+elif [ "$1" = "board_alias" ];then shift
+  board_pattern=$1; shift
+  output="$(
+    $0 board ${board_pattern} \
+      | jq -r '.name|gsub(" ";"_")'
+  )"
+
 elif [ "$1" = "board_lists" ];then shift
   output="$(
     $0 boards \
@@ -101,7 +108,7 @@ elif [ "$1" = "list_lists" ];then shift
   board_pattern="$1";shift
   output="$(
     $0 board ${board_pattern}\
-      | jq -r "map(\
+      | jq -r "[.]|map(\
 .formatted=[]| \
 .formatted+=[ .shortLink + \" \" + .name ] | \
 .formatted+=[ \
@@ -117,7 +124,7 @@ elif [ "$1" = "board_list_map" ];then shift ## used by trellowarrior
   board_pattern=$1; shift
   output="$( 
     $0 board ${board_pattern} \
-      | jq -c 'first|.lists|map({id,name})'
+      | jq -c '.lists|map({id,name})'
     )"
 
 elif [ "$1" = "list_name_map" ];then shift ## used by trellowarrior
@@ -136,7 +143,7 @@ elif [ "$1" = "list_name_to_id" ];then shift ##
     $0 board ${board_pattern} \
       | jq -r \
       --arg list_pattern "${list_pattern}" \
-      'first|.lists//[]|map(select(.name|gsub(" ";"_")|test($list_pattern;"i"))|.id)[]'
+      '.lists//[]|map(select(.name|gsub(" ";"_")|test($list_pattern;"i"))|.id)[]'
     )"
 
 elif [ "$1" = "board_custom_fields" ];then shift ##
