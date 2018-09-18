@@ -95,7 +95,8 @@ elif [ "$1" = "board_alias" ];then shift
   board_pattern=$1; shift
   output="$(
     $0 board ${board_pattern} \
-      | jq -r '.name|gsub(" ";"_")'
+      | jq -r '.name|gsub(" ";"_")' \
+      | tr '[:upper:]' '[:lower:]'
   )"
 
 elif [ "$1" = "board_lists" ];then shift
@@ -369,6 +370,13 @@ elif [ "$1" = "card_add" ];then shift ##
 &name=${card_name}\
 "
 
+#   RESPONSE_JSON=$(curl -s -XPOST "https://trello.com/1/lists/${LANE_ID}/cards?key=$KEY&token=$TRELLO_TOKEN\
+# &name=$NAME\
+# &labels=yellow\
+# &desc=${DESCRIPTION}\
+# " )
+
+
 elif [ "$1" = "card_delete" ];then shift
   card_id="$1"; shift
   curl -s -XDELETE "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
@@ -429,3 +437,41 @@ else
   echo "$output"
 fi
 
+
+
+# elif [ "$1" = "showcomment" ];then
+#   shift
+#   CARD_ID=$1
+#   if [ -z "$CARD_ID" ]; then
+#     echo "first argument (CARD_ID) cannot be empty" >&2
+#     exit 1
+#   fi
+#   shift
+#   RESPONSE_JSON=$(curl -s "https://trello.com/1/cards/${CARD_ID}/actions?key=$KEY&token=$TRELLO_TOKEN\
+# &filter=commentCard,updateCard" \
+# | jq -c '.[]')
+#
+# elif [ "$1" = "search" ];then
+#   shift
+#   QUERY="$(echo $@ | python -c "import urllib, sys; print urllib.quote(sys.stdin.read()[:-1])" )"
+#   RESPONSE_JSON=$(curl -s "https://trello.com/1/search?key=$KEY&token=$TRELLO_TOKEN\
+# &modelTypes=cards\
+# &card_fields=idBoard,idList,shortLink,shortUrl,closed,dateLastActivity,name,desc,badges\
+# &card_limit=100\
+# &query=$QUERY" | jq -c '.cards[]')
+#
+# elif [ "$1" = "search_lists" ];then
+#   shift
+#   QUERY="$(echo $@ | python -c "import urllib, sys; print urllib.quote(sys.stdin.read()[:-1])" )"
+#   RESPONSE_JSON=$(curl -s "https://trello.com/1/search?key=$KEY&token=$TRELLO_TOKEN\
+# &modelTypes=lists\
+# &query=$QUERY")
+#
+#
+# elif [ "$1" = "card_to_top" ];then shift
+#   CARD_ID=$1; shift
+#   [[ -z "$CARD_ID" ]] && { echo "no card id provided"; exit 1; }
+#   curl -s -X PUT -d "value=top" "https://trello.com/1/cards/${CARD_ID}/pos?key=$TRELLO_KEY&token=$TRELLO_TOKEN"
+#
+#
+#
