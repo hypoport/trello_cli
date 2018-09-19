@@ -95,7 +95,7 @@ elif [ "$1" = "board_alias" ];then shift
   board_pattern=$1; shift
   output="$(
     $0 board ${board_pattern} \
-      | jq -r '.name|gsub(" ";"_")' \
+      | jq -r '.name|gsub(" ";"_")|.[0:15]' \
       | tr '[:upper:]' '[:lower:]'
   )"
 
