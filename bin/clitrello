@@ -370,6 +370,18 @@ elif [ "$1" = "card_show_comments" ];then shift ##
 # &filter=commentCard,updateCard\
   # | jq -c 'map(select(.type=="commentCard")|{date,member:((.memberCreator.initials//"")//""),text:(.data.text)})[]'
 
+elif [ "$1" = "card_checklists" ];then shift ##
+  card_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}\
+&checkItems=all\
+&checkItem_fields=all\
+&fields=all\
+" \
+| jq -r 'map("\(.name) \n\(.checkItems|sort_by(.pos)|map("  \(if (.state=="incomplete") then "( )" else "(v)" end) \(.name)")|join("\n"))")[]' \
+    )"
+
 elif [ "$1" = "card_add" ];then shift ##
   list_pattern="$1"; shift
   list_id="$($0 list_name_to_id ${list_pattern})"
