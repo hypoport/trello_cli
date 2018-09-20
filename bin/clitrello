@@ -358,6 +358,17 @@ elif [ "$1" = "card_comment" ];then shift ##
       "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
     )"
 
+elif [ "$1" = "card_show_comments" ];then shift ##
+  card_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/actions?key=${trello_key}&token=${trello_token}\
+&filter=commentCard\
+" \
+  | jq -c 'map(select(.type=="commentCard")|{date,member:(.memberCreator.initials//""),text:(.data.text)})[]'
+    )"
+# &filter=commentCard,updateCard\
+
 elif [ "$1" = "card_add" ];then shift ##
   list_pattern="$1"; shift
   list_id="$($0 list_name_to_id ${list_pattern})"
@@ -444,18 +455,6 @@ fi
 
 
 
-# elif [ "$1" = "showcomment" ];then
-#   shift
-#   CARD_ID=$1
-#   if [ -z "$CARD_ID" ]; then
-#     echo "first argument (CARD_ID) cannot be empty" >&2
-#     exit 1
-#   fi
-#   shift
-#   RESPONSE_JSON=$(curl -s "https://trello.com/1/cards/${CARD_ID}/actions?key=$KEY&token=$TRELLO_TOKEN\
-# &filter=commentCard,updateCard" \
-# | jq -c '.[]')
-#
 # elif [ "$1" = "search" ];then
 #   shift
 #   QUERY="$(echo $@ | python -c "import urllib, sys; print urllib.quote(sys.stdin.read()[:-1])" )"
