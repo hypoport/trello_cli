@@ -365,9 +365,10 @@ elif [ "$1" = "card_show_comments" ];then shift ##
       "https://trello.com/1/cards/${card_id}/actions?key=${trello_key}&token=${trello_token}\
 &filter=commentCard\
 " \
-  | jq -c 'map(select(.type=="commentCard")|{date,member:(.memberCreator.initials//""),text:(.data.text)})[]'
+  | jq -c 'map(select(.type=="commentCard")|{date,member:((.memberCreator.initials//"")//""),text:(.data.text)})[]'
     )"
 # &filter=commentCard,updateCard\
+  # | jq -c 'map(select(.type=="commentCard")|{date,member:((.memberCreator.initials//"")//""),text:(.data.text)})[]'
 
 elif [ "$1" = "card_add" ];then shift ##
   list_pattern="$1"; shift
