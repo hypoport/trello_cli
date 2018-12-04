@@ -354,7 +354,7 @@ elif [ "$1" = "card_comment" ];then shift ##
   output="$(
     curl -s \
       -X POST \
-      --data-url "text=$comment" \
+      --data-url "text=${comment}" \
       "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
     )"
 
