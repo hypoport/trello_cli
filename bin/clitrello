@@ -453,6 +453,25 @@ elif [ "$1" = "test" ];then shift
   # curl -o /dev/null -w "%{http_code}" -i -s "https://trello.com/1/members/${member}?key=${trello_key}&token=${trello_token}"
   exit
 
+elif [[ "$1" == "search" ]];then shift
+  query="${@}"
+  shift $#
+  # https://developers.trello.com/v1.0/reference#search-1
+  : ${limit:="100"}
+  : ${fields:="idBoard,idList,shortLink,shortUrl,closed,dateLastActivity,name,desc,badges"}
+  : ${type:="cards"} #lists
+  # idBoards mine or a comma-separated list of board ids
+
+  curl -s \
+    -G \
+    --data-url "query=${query}" \
+    "https://trello.com/1/search?key=${trello_key}&token=${trello_token}\
+&modelTypes=${type}\
+&card_fields=${fields}\
+&card_limit=${limit}\
+" \
+  | jq -c '.cards[]'
+
 else
   echo "unknown command: $@" >&2
   exit 1
@@ -466,25 +485,6 @@ else
   echo "$output"
 fi
 
-
-
-# elif [ "$1" = "search" ];then
-#   shift
-#   QUERY="$(echo $@ | python -c "import urllib, sys; print urllib.quote(sys.stdin.read()[:-1])" )"
-#   RESPONSE_JSON=$(curl -s "https://trello.com/1/search?key=$KEY&token=$TRELLO_TOKEN\
-# &modelTypes=cards\
-# &card_fields=idBoard,idList,shortLink,shortUrl,closed,dateLastActivity,name,desc,badges\
-# &card_limit=100\
-# &query=$QUERY" | jq -c '.cards[]')
-#
-# elif [ "$1" = "search_lists" ];then
-#   shift
-#   QUERY="$(echo $@ | python -c "import urllib, sys; print urllib.quote(sys.stdin.read()[:-1])" )"
-#   RESPONSE_JSON=$(curl -s "https://trello.com/1/search?key=$KEY&token=$TRELLO_TOKEN\
-# &modelTypes=lists\
-# &query=$QUERY")
-#
-#
 # elif [ "$1" = "card_to_top" ];then shift
 #   CARD_ID=$1; shift
 #   [[ -z "$CARD_ID" ]] && { echo "no card id provided"; exit 1; }
