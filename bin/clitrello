@@ -342,6 +342,15 @@ elif [ "$1" = "card_tags" ];then shift ##
   | tr -d '\r' \
   || true
 
+elif [ "$1" = "card_comment_vipe" ];then shift ##
+  card_id="$1"; shift
+  comment="$(echo | vipe )"
+  output="$(
+    curl -s \
+      -X POST \
+      --data-url "text=${comment}" \
+      "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
+    )"
 
 elif [ "$1" = "card_comment" ];then shift ##
   card_id="$1"; shift
