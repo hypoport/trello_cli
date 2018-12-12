@@ -246,15 +246,14 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   board="$(jq -r '.board' <<<"$line")"
   list="$(jq -r '.list' <<<"$line")"
   tags="$(jq -r '.tags//""' <<<"$line")"
+  due="$(jq -r '.due//""' <<<"$line")"
   priority="$(jq -r '.priority//""' <<<"$line")"
 
   idList="$($0 list_name_to_id "${board}:${list}")"
   idBoard="$($0 board_match_to_id ${board})"
 
-  #desc
   #idMembers
   #idLabels
-  #due
 
   : ${limit:="60"}
   : ${wait_time:="10"}
@@ -265,6 +264,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
       --data-urlencode "idBoard=${idBoard}" \
       --data-urlencode "idList=${idList}" \
       --data-urlencode "name=${name}" \
+      --data-urlencode "due=${due}" \
       "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
     | grep -i "x-rate-limit-api-token-remaining" \
     | awk -F':' '{print $2}' \
@@ -425,6 +425,14 @@ elif [ "$1" = "card_archive" ];then shift ##
   curl -s -XPUT "https://trello.com/1/cards/${card_id}/closed?key=${trello_key}&token=${trello_token}\
 &value=true\
 "
+
+elif [ "$1" = "card_put_value" ];then shift ##
+  card_id="$1"; shift
+  key="$1"; shift
+  value="$1"; shift
+  curl -s -XPUT \
+    --data-url "${key}=${value}" \
+    "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}"
 
 elif [ "$1" = "card_name" ];then shift ##
   card_id="$1"; shift
