@@ -257,7 +257,10 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
 
   : ${limit:="60"}
   : ${wait_time:="10"}
-  rate_limit_remaining="$( 
+
+
+
+  response="$(
     curl \
       -i -s \
       -XPUT \
@@ -266,13 +269,30 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
       --data-urlencode "name=${name}" \
       --data-urlencode "due=${due}" \
       "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
+      )"
+
+  headers="$(sed -n '1,/^$/p' <<<"${response}")"
+  body="$(sed -n '/^$/,$p' <<<"${response}" | sed '1d')"
+
+  read -r http_version status_code reason_phrase <<<"${headers}"
+
+  if [[ "${status_code}" =~ ^409$ ]] && [[ "${body}" =~ "LOCK_TAKEN_ERROR" ]];then
+    echo "LOCK TAKEN ERROR"
+    exit 1
+  fi
+
+  rate_limit_remaining="$( 
+    echo "${headers}" \
     | grep -i "x-rate-limit-api-token-remaining" \
     | awk -F':' '{print $2}' \
     | tr -d ' ' \
     | tr -d '\r' \
     || true \
   )"
-  echo "rate_limit update card: ${rate_limit_remaining}"
+
+
+
+  echo "rate_limit update card ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
     echo "rate limit is below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
@@ -280,7 +300,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   rate_limit_remaining="$( 
     $0 card_tags ${board} ${card_id} "${tags}"
     )"
-  echo "rate_limit tags: ${rate_limit_remaining}"
+  echo "rate_limit tags ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
     echo "rate limit is below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
@@ -288,7 +308,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   rate_limit_remaining="$( 
     $0 card_prio ${board} ${card_id} "${priority}"
     )"
-  echo "rate_limit prio: ${rate_limit_remaining}"
+  echo "rate_limit prio ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
     echo "rate limit is below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
@@ -306,8 +326,7 @@ elif [ "$1" = "check_rate" ];then shift
   echo "${rate_limit_remaining}"
 
 elif [ "$1" = "update_cards_from_json" ];then shift ##
-  parallel -j8 -N1 --pipe "$0 update_card_from_json"
-
+  parallel -j1 -N1 --pipe "$0 update_card_from_json"
 
 elif [ "$1" = "card_prio" ];then shift ##
   board_pattern="$1"; shift
