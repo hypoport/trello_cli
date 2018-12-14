@@ -294,7 +294,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
 
   echo "rate_limit update card ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
-    echo "rate limit is below ${limit} wait ${wait_time}"
+    echo "rate limit is (${rate_limit_remaining}) below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
@@ -302,7 +302,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     )"
   echo "rate_limit tags ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
-    echo "rate limit is below ${limit} wait ${wait_time}"
+    echo "rate limit is (${rate_limit_remaining}) below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
   fi
   rate_limit_remaining="$( 
@@ -310,7 +310,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     )"
   echo "rate_limit prio ${card_id}: ${rate_limit_remaining}"
   if [[ ${rate_limit_remaining} -lt ${limit} ]];then
-    echo "rate limit is below ${limit} wait ${wait_time}"
+    echo "rate limit is (${rate_limit_remaining}) below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
   fi
 
