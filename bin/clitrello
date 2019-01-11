@@ -411,6 +411,115 @@ elif [ "$1" = "card_checklists" ];then shift ##
 | jq -r 'map("\(.name) \n\(.checkItems|sort_by(.pos)|map("  \(if (.state=="incomplete") then "( )" else "(v)" end) \(.name)")|join("\n"))")[]' \
     )"
 
+elif [ "$1" = "card_checklists_raw" ];then shift ##
+  card_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}\
+&checkItems=all\
+&checkItem_fields=all\
+&fields=all\
+" 
+    )"
+
+elif [ "$1" = "card_checklists_get_id" ];then shift ##
+  card_id="$1"; shift
+  list_index="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}\
+&checkItems=all\
+&checkItem_fields=all\
+&fields=all\
+"  \
+  | jq -r ".[${list_index}].id//empty"
+    )"
+
+elif [ "$1" = "card_checklists_get_item_id" ];then shift ##
+  card_id="$1"; shift
+  list_index="$1"; shift
+  item_index="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}\
+&checkItems=all\
+&checkItem_fields=all\
+&fields=all\
+"  \
+  | jq -r ".[${list_index}].checkItems[${item_index}].id//empty"
+    )"
+
+elif [ "$1" = "card_checklist_update_item" ];then shift ##
+  card_id="$1"; shift
+  # list_id="$1"; shift
+  item_id="$1"; shift
+  name="$@"; shift $#
+      # --data-urlencode "state=complete" \ incomplete
+  output="$(
+    curl -s \
+      -XPUT \
+      --data-urlencode "name=${name}" \
+      --data-urlencode "state=complete" \
+      "https://trello.com/1/cards/${card_id}/checkItem/${item_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
+      # "https://trello.com/1/checklists/${list_id}/checkItems/${item_id}?key=${trello_key}&token=${trello_token}" 
+      # "https://trello.com/1/cards/${card_id}/checkItem/${item_id}?key=${trello_key}&token=${trello_token}" 
+
+elif [ "$1" = "card_checklist_del_item" ];then shift ##
+  list_id="$1"; shift
+  item_id="$1"; shift
+  output="$(
+    curl -s \
+      -XDELETE \
+      "https://trello.com/1/checklists/${list_id}/checkItems/${item_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
+elif [ "$1" = "card_checklist_add_list" ];then shift ##
+  card_id="$1"; shift
+  name="$@"; shift $#
+  : ${pos:="bottom"} #top or int
+  output="$(
+    curl -s \
+      -XPOST \
+      --data-urlencode "name=${name}" \
+      --data-urlencode "pos=${pos}" \
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}" 
+    )"
+
+elif [ "$1" = "card_checklist_add_item" ];then shift ##
+  list_id="$1"; shift
+  name="$@"; shift $#
+  : ${pos:="bottom"} #top or int
+  : ${checked:="false"} #true
+  output="$(
+    curl -s \
+      -XPOST \
+      --data-urlencode "name=${name}" \
+      --data-urlencode "pos=${pos}" \
+      --data-urlencode "checked=${checked}" \
+      "https://trello.com/1/checklists/${list_id}/checkItems?key=${trello_key}&token=${trello_token}" 
+    )"
+
+elif [ "$1" = "card_checklist_update_list" ];then shift ##
+  list_id="$1"; shift
+  name="$@"; shift $#
+  # pos
+  output="$(
+    curl -s \
+      -XPUT \
+      --data-urlencode "name=${name}" \
+      "https://trello.com/1/checklists/${list_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
+elif [ "$1" = "card_checklist_del_list" ];then shift ##
+  list_id="$1"; shift
+  output="$(
+    curl -s \
+      -XDELETE \
+      "https://trello.com/1/checklists/${list_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
 elif [ "$1" = "card_add" ];then shift ##
   list_pattern="$1"; shift
   list_id="$($0 list_name_to_id ${list_pattern})"
