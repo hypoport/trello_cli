@@ -484,7 +484,8 @@ elif [ "$1" = "card_checklist_add_list" ];then shift ##
       -XPOST \
       --data-urlencode "name=${name}" \
       --data-urlencode "pos=${pos}" \
-      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}" 
+      "https://trello.com/1/cards/${card_id}/checklists?key=${trello_key}&token=${trello_token}" \
+      | jq -r '.id'
     )"
 
 elif [ "$1" = "card_checklist_add_item" ];then shift ##
