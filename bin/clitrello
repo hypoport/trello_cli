@@ -475,6 +475,13 @@ elif [ "$1" = "card_checklist_del_item" ];then shift ##
       "https://trello.com/1/checklists/${list_id}/checkItems/${item_id}?key=${trello_key}&token=${trello_token}" 
     )"
 
+elif [ "$1" = "checklist_info" ];then shift ##
+  list_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/checklists/${list_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
 elif [ "$1" = "card_checklist_add_list" ];then shift ##
   card_id="$1"; shift
   name="$@"; shift $#
