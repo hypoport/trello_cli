@@ -371,6 +371,14 @@ elif [ "$1" = "card_comment_vipe" ];then shift ##
       "https://trello.com/1/cards/${card_id}/actions/comments?key=${trello_key}&token=${trello_token}"
     )"
 
+elif [ "$1" = "card_del_comment" ];then shift ##
+  comment_id="$1"; shift
+  output="$(
+    curl -s \
+      -X DELETE \
+      "https://trello.com/1/actions/${comment_id}?key=${trello_key}&token=${trello_token}"
+    )"
+
 elif [ "$1" = "card_comment" ];then shift ##
   card_id="$1"; shift
   if [[ -n "$@" ]]; then
