@@ -250,8 +250,13 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
   due="$(jq -r '.due//""' <<<"$line")"
   priority="$(jq -r '.priority//""' <<<"$line")"
 
-  idList="$($0 list_name_to_id "${board}:${list}")"
   idBoard="$($0 board_match_to_id ${board})"
+  idList="$($0 list_name_to_id "${board}:${list}")"
+
+  if [[ -z "${idList}" ]];then
+    echo "no matching list found for ${board}:${list}" >&2
+    exit 1
+  fi
 
   #idMembers
   #idLabels
