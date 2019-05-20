@@ -204,6 +204,7 @@ elif [ "$1" = "cache_update" ];then shift ##
 elif [ "$1" = "cards" ];then shift ##
   board_pattern=$1; shift
   board_id="$($0 board_match_to_id ${board_pattern})"
+  : ${actions:="commentCard"}
   output="$(curl -s "https://trello.com/1/boards/${board_id}/cards?key=${trello_key}&token=${trello_token}\
 &filter=open\
 &fields=all\
@@ -211,7 +212,7 @@ elif [ "$1" = "cards" ];then shift ##
 &card_fields=all\
 &members=true\
 &member_fields=initials,username\
-&actions=commentCard\
+&actions=${actions}\
 &checklists=all\
 &customFieldItems=true\
 " \
