@@ -1,8 +1,7 @@
 # trello_cli
 
-## how to get API Token
+This trello client is used to get information from trello as json data.
 
-* <https://trello.com/app-key>
 
 ## How to start
 
