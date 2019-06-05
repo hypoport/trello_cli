@@ -278,9 +278,8 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
       "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}" \
       )"
 
-  headers="$(sed -n '1,/^$/p' <<<"${response}")"
-  body="$(sed -n '/^$/,$p' <<<"${response}" | sed '1d')"
-
+  headers="$(tr -d '\r' <<<"${response}" | sed -n '1,/^$/p' )"
+  body="$(tr -d '\r' <<<"${response}" | sed -n '/^$/,$p' | sed '1d')"
   read -r http_version status_code reason_phrase <<<"${headers}"
 
   if [[ "${status_code}" =~ ^409$ ]] && [[ "${body}" =~ "LOCK_TAKEN_ERROR" ]];then
@@ -290,17 +289,14 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
 
   rate_limit_remaining="$( 
     echo "${headers}" \
-    | grep -i "x-rate-limit-api-token-remaining" \
+    | grep -i "^x-rate-limit-api-token-remaining: [0-9]*" \
     | awk -F':' '{print $2}' \
     | tr -d ' ' \
-    | tr -d '\r' \
     || true \
   )"
 
-
-
   echo "rate_limit update card ${card_id}: ${rate_limit_remaining}"
-  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+  if [[ "${rate_limit_remaining}" -lt "${limit}" ]];then
     echo "rate limit is (${rate_limit_remaining}) below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
   fi
@@ -308,7 +304,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
     $0 card_tags ${board} ${card_id} "${tags}"
     )"
   echo "rate_limit tags ${card_id}: ${rate_limit_remaining}"
-  if [[ ${rate_limit_remaining} -lt ${limit} ]];then
+  if [[ "${rate_limit_remaining}" -lt "${limit}" ]];then
     echo "rate limit is (${rate_limit_remaining}) below ${limit} wait ${wait_time}"
     sleep ${wait_time} 
   fi
@@ -324,7 +320,7 @@ elif [ "$1" = "update_card_from_json" ];then shift ##
 elif [ "$1" = "check_rate" ];then shift
   rate_limit_remaining="$( 
     curl -i -s "https://trello.com/1/members/${member}/initials?key=${trello_key}&token=${trello_token}" \
-      | grep -i "x-rate-limit-api-token-remaining" \
+      | grep -i "^x-rate-limit-api-token-remaining: [0-9]*" \
       | awk -F':' '{print $2}' \
       | tr -d ' ' \
       | tr -d '\r' \
@@ -346,7 +342,7 @@ elif [ "$1" = "card_prio" ];then shift ##
     -H "Content-Type: application/json" \
     --data-binary @- \
     "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}" \
-  | grep -i "x-rate-limit-api-token-remaining" \
+  | grep -i "^x-rate-limit-api-token-remaining: [0-9]*" \
   | awk -F':' '{print $2}' \
   | tr -d ' ' \
   | tr -d '\r' \
@@ -362,7 +358,7 @@ elif [ "$1" = "card_tags" ];then shift ##
     -H "Content-Type: application/json" \
     --data-binary @- \
     "https://trello.com/1/card/${card_id}/customField/${custom_field_id}/item?key=${trello_key}&token=${trello_token}" \
-  | grep -i "x-rate-limit-api-token-remaining" \
+  | grep -i "^x-rate-limit-api-token-remaining: [0-9]*" \
   | awk -F':' '{print $2}' \
   | tr -d ' ' \
   | tr -d '\r' \
