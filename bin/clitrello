@@ -364,6 +364,23 @@ elif [ "$1" = "card_tags" ];then shift ##
   | tr -d '\r' \
   || true
 
+elif [ "$1" = "card_attachments" ];then shift ##
+  card_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/cards/${card_id}/attachments?key=${trello_key}&token=${trello_token}"
+    )"
+
+elif [ "$1" = "card_attachment_add" ];then shift ##
+  card_id="$1"; shift
+  url="$1"; shift
+  output="$(
+    curl -s \
+      -X POST \
+      --data-url "url=${url}" \
+      "https://trello.com/1/cards/${card_id}/attachments?key=${trello_key}&token=${trello_token}"
+    )"
+
 elif [ "$1" = "card_comment_vipe" ];then shift ##
   card_id="$1"; shift
   comment="$(echo | vipe )"
