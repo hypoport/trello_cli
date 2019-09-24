@@ -368,7 +368,7 @@ elif [ "$1" = "card_attachments" ];then shift ##
   card_id="$1"; shift
   output="$(
     curl -s \
-      "https://trello.com/1/cards/${card_id}/attachments?key=${trello_key}&token=${trello_token}"
+      "https://trello.com/1/cards/${card_id}/attachments?key=${trello_key}&token=${trello_token}&fields=url"
     )"
 
 elif [ "$1" = "card_attachment_add" ];then shift ##
