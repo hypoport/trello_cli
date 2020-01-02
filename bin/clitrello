@@ -427,6 +427,13 @@ elif [ "$1" = "card_show_comments" ];then shift ##
 # &filter=commentCard,updateCard\
   # | jq -c 'map(select(.type=="commentCard")|{date,member:((.memberCreator.initials//"")//""),text:(.data.text)})[]'
 
+elif [ "$1" = "custom_field_info" ];then shift ##
+  custom_field_id="$1"; shift
+  output="$(
+    curl -s \
+      "https://trello.com/1/customFields/${custom_field_id}?key=${trello_key}&token=${trello_token}" 
+    )"
+
 elif [ "$1" = "card_checklists" ];then shift ##
   card_id="$1"; shift
   output="$(
