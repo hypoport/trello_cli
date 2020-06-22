@@ -222,7 +222,7 @@ elif [ "$1" = "cards" ];then shift ##
 elif [ "$1" = "card" ];then shift ##
   card_id="$1"; shift
   output="$(curl -s "https://trello.com/1/cards/${card_id}?key=${trello_key}&token=${trello_token}\
-&actions=commentCard\
+&actions=commentCard,addAttachmentToCard\
 &checklists=all\
 &fields=all\
 &customFieldItems=true\
